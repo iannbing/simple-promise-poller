@@ -1,9 +1,20 @@
 import { hasValue } from './utils/variable';
 import { CancelablePromise, makeCancelable } from './utils/promise';
-import { ResolvePromise } from './types';
+import { ResolvePromise, StopPollingFunction } from './types';
 
 const DEFAULT_INTERVAL = 2000;
 const DEFAULT_RETRY = 10;
+
+const RetryCounter = () => {
+  let retry = 0;
+  return {
+    getValue: () => retry,
+    increment: () => {
+      retry += 1;
+      return retry;
+    },
+  };
+};
 
 export const Poller = (config?: {
   interval?: number;
@@ -26,7 +37,7 @@ export const Poller = (config?: {
     }
   };
 
-  function poll<T = any>(resolvePromise: ResolvePromise<T>) {
+  function poll(resolvePromise: ResolvePromise) {
     promiseCount += 1;
     const promiseKey = promiseCount;
 
@@ -35,28 +46,27 @@ export const Poller = (config?: {
       removeEvent(intervalId);
     };
 
-    let hasRetried = 0;
-    const getHasRetryCount = () => hasRetried;
+    const retryCounter = RetryCounter();
     const masterPromise = makeCancelable(
-      new Promise(async (resolve, reject) => {
-        const stopPolling = (isResolved = true) => {
+      new Promise<void>(async (resolve, reject) => {
+        const stopPolling: StopPollingFunction = (isResolved = true) => {
           clean(intervalId);
           if (isResolved) {
-            resolve(undefined);
+            resolve();
           } else {
-            reject();
+            reject({ isCanceled: true });
           }
         };
         const runTask = async () => {
           try {
-            await resolvePromise(stopPolling, getHasRetryCount);
+            await resolvePromise(stopPolling, retryCounter.getValue);
           } catch (error) {
-            if (hasRetried >= retry) {
+            if (retryCounter.getValue() >= retry) {
               clean(intervalId);
-              reject();
+              reject(error);
               return;
             }
-            hasRetried += 1;
+            retryCounter.increment();
           }
         };
         if (startImmediately) runTask();
@@ -66,11 +76,11 @@ export const Poller = (config?: {
     );
 
     cancelablePromises[promiseKey] = masterPromise;
-    return masterPromise;
+    return masterPromise.promise;
   }
 
   return {
-    add: <T>(resolvePromise: ResolvePromise<T>) => poll(resolvePromise),
+    add: (resolvePromise: ResolvePromise) => poll(resolvePromise),
     isIdling: () => Object.keys(eventRecords).length === 0,
     clean: async () => {
       Object.keys(eventRecords).forEach(intervalIdAsString => {

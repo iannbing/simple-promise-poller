@@ -1,6 +1,5 @@
 export type CancelablePromise<T = unknown> = {
   readonly promise: Promise<T>;
-  readonly isCanceled: boolean;
   readonly cancel: () => void;
 };
 
@@ -21,7 +20,6 @@ export function makeCancelable<T>(original: Promise<T>): CancelablePromise<T> {
 
   return {
     promise,
-    isCanceled,
     cancel: () => {
       isCanceled = true;
     },
