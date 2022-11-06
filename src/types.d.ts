@@ -1,12 +1,14 @@
-export type PollerCallbackProps<T, E = Error> =
-  | {
-      status: 'fulfilled';
-      data: T;
-    }
-  | {
-      status: 'rejected';
-      error: E;
-    };
+export type Resolved<T> = {
+  status: 'fulfilled';
+  data: T;
+};
+
+export type Rejected<E> = {
+  status: 'rejected';
+  error: E;
+};
+
+export type PollerCallbackProps<T, E = Error> = Resolved<T> | Rejected<E>;
 
 export type PollerCallback<T, E = Error> = (
   props: PollerCallbackProps<T, E>
