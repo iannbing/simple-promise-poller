@@ -19,3 +19,15 @@ export type Poll<T, E = Error> = (
   callback?: PollerCallback<T, E> | number,
   interval?: number
 ) => Promise<T>;
+
+export type ResolvePromise<T> = (
+  stopPolling: StopPollingFunction,
+  getHasRetryCount: GetHasRetryCount
+) => Promise<T>;
+
+export type StopPollingFunction = (
+  isResolved: boolean,
+  hasRetried: number
+) => void;
+
+export type GetHasRetryCount = () => number;

@@ -1,48 +1,29 @@
-export type CancelablePromise<T = unknown> = Promise<T> & {
-  readonly isCanceled: () => boolean;
-  readonly cancel: (message?: string) => void;
+export type CancelablePromise<T = unknown> = {
+  readonly promise: Promise<T>;
+  readonly isCanceled: boolean;
+  readonly cancel: () => void;
 };
-
-export class PromiseCanceledError extends Error {
-  readonly name = 'PromiseCanceledError';
-  readonly isCanceled = true;
-
-  constructor(message = 'The promise was canceled.') {
-    super(message);
-  }
-}
 
 /**
  * Wraps a promise in a new one that can be canceled.
- * If the `cancel` function is called, the promise always rejects with a `PromiseCanceledError`,
+ * If the `cancel` function is called, the promise always rejects with an Error with { isCanceled: true },
  * regardless of whether it resolved or rejected.
  * @param original The original promise to make cancelable.
- * @param onEnd Called immediately when the promise is resolved, rejected, or canceled.
  */
-export function makeCancelable<T>(
-  original: Promise<T>,
-  onEnd?: () => void
-): CancelablePromise<T> {
-  let cancelMessage: string | undefined = undefined;
+export function makeCancelable<T>(original: Promise<T>): CancelablePromise<T> {
+  let isCanceled = false;
 
   const promise = new Promise<T>((resolve, reject) => {
     original
-      .then(result => (cancelMessage ? reject(cancelMessage) : resolve(result)))
-      .catch(error => (cancelMessage ? reject(cancelMessage) : reject(error)))
-      .finally(() => onEnd?.());
+      .then(result => (isCanceled ? reject({ isCanceled }) : resolve(result)))
+      .catch(error => (isCanceled ? reject({ isCanceled }) : reject(error)));
   });
 
-  return Object.assign(promise, {
-    isCanceled: () => Boolean(cancelMessage),
-    cancel: (message?: string) => {
-      cancelMessage = message;
-      onEnd?.();
+  return {
+    promise,
+    isCanceled,
+    cancel: () => {
+      isCanceled = true;
     },
-  });
+  };
 }
-
-export const isCancelable = <T>(
-  promise: Promise<T>
-): promise is CancelablePromise<T> =>
-  typeof (promise as CancelablePromise).cancel === 'function' &&
-  typeof (promise as CancelablePromise).isCanceled === 'function';

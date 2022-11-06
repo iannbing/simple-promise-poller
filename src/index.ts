@@ -1,17 +1,6 @@
 import { hasValue } from './utils/variable';
 import { CancelablePromise, makeCancelable } from './utils/promise';
-
-export type ResolvePromise<T> = (
-  stopPolling: StopPollingFunction,
-  getHasRetryCount: GetHasRetryCount
-) => Promise<T>;
-
-export type StopPollingFunction = (
-  isResolved: boolean,
-  hasRetried: number
-) => void;
-
-export type GetHasRetryCount = () => number;
+import { ResolvePromise } from './types';
 
 const DEFAULT_INTERVAL = 2000;
 const DEFAULT_RETRY = 10;
@@ -28,7 +17,7 @@ export const Poller = (config?: {
   } = config || {};
 
   let promiseCount = 0;
-  let promises: Record<string, CancelablePromise<unknown>> = {};
+  let cancelablePromises: Record<string, CancelablePromise<unknown>> = {};
   const eventRecords: Record<string, true> = {};
   const removeEvent = (intervalId: number) => {
     if (hasValue(eventRecords[intervalId])) {
@@ -42,7 +31,7 @@ export const Poller = (config?: {
     const promiseKey = promiseCount;
 
     const clean = (intervalId: number) => {
-      delete promises[promiseKey];
+      delete cancelablePromises[promiseKey];
       removeEvent(intervalId);
     };
 
@@ -76,23 +65,25 @@ export const Poller = (config?: {
       })
     );
 
-    promises[promiseKey] = masterPromise;
+    cancelablePromises[promiseKey] = masterPromise;
     return masterPromise;
   }
 
   return {
     add: <T>(resolvePromise: ResolvePromise<T>) => poll(resolvePromise),
     isIdling: () => Object.keys(eventRecords).length === 0,
-    clean: (remainingTimeouts?: number[]) => {
+    clean: async () => {
       Object.keys(eventRecords).forEach(intervalIdAsString => {
         const intervalId = Number(intervalIdAsString);
-        if (!remainingTimeouts?.includes(intervalId)) {
-          window.clearInterval(Number(intervalId));
-          delete eventRecords[intervalIdAsString];
-        }
+        removeEvent(Number(intervalId));
       });
-      Object.values(promises).forEach(promise => promise.cancel());
-      promises = {};
+      await Promise.allSettled(
+        Object.values(cancelablePromises).map(promise => {
+          promise.cancel();
+          return promise.promise;
+        })
+      );
+      cancelablePromises = {};
     },
   };
 };
