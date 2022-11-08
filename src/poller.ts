@@ -43,7 +43,7 @@ export const Poller = (config?: PollerConfig) => {
 
   let promiseCount = 0;
   let cancelablePromises: Record<string, CancelablePromise<unknown>> = {};
-  const eventRecords: Record<string, true> = {};
+  let eventRecords: Record<string, true> = {};
   const removeEvent = (intervalId: number) => {
     if (hasValue(eventRecords[intervalId])) {
       window.clearInterval(intervalId);
@@ -56,8 +56,10 @@ export const Poller = (config?: PollerConfig) => {
     const promiseKey = promiseCount;
 
     const clean = (intervalId: number) => {
-      delete cancelablePromises[promiseKey];
-      removeEvent(intervalId);
+      try {
+        delete cancelablePromises[promiseKey];
+        removeEvent(intervalId);
+      } catch (error) {}
     };
 
     const retryCounter = RetryCounter();
@@ -68,7 +70,7 @@ export const Poller = (config?: PollerConfig) => {
           if (isResolved) {
             resolve();
           } else {
-            reject({ isCanceled: true });
+            reject('canceled');
           }
         };
         const runTask = async () => {
@@ -96,17 +98,17 @@ export const Poller = (config?: PollerConfig) => {
   return {
     add: (resolvePromise: ResolvePromise) => poll(resolvePromise),
     isIdling: () => Object.keys(eventRecords).length === 0,
-    clean: async () => {
+    clean: () => {
+      Object.values(cancelablePromises).forEach(promise => {
+        promise.cancel();
+      });
+
       Object.keys(eventRecords).forEach(intervalIdAsString => {
         const intervalId = Number(intervalIdAsString);
-        removeEvent(Number(intervalId));
+        window.clearInterval(intervalId);
       });
-      await Promise.allSettled(
-        Object.values(cancelablePromises).map(promise => {
-          promise.cancel();
-          return promise.promise;
-        })
-      );
+
+      eventRecords = {};
       cancelablePromises = {};
     },
   };
