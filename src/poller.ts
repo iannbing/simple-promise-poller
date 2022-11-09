@@ -5,16 +5,17 @@ import { RetryCounter } from './retry-counter';
 import { isInteger, isNonNegativeInteger } from './utils/number';
 
 const DEFAULT_INTERVAL = 2000;
-const DEFAULT_RETRY = 10;
+const DEFAULT_RETRY_LIMIT = 10;
 
-const getValidRetry = (config: PollerConfig | undefined) => {
-  const retryConfig = config?.retry;
+const getValidRetryLimit = (config: PollerConfig | undefined) => {
+  const retryLimit = config?.retryLimit;
 
-  if (!hasValue(retryConfig)) return DEFAULT_RETRY;
-  if (isNonNegativeInteger(retryConfig)) return retryConfig;
+  if (retryLimit === null) return null;
+  if (!hasValue(retryLimit)) return DEFAULT_RETRY_LIMIT;
+  if (isNonNegativeInteger(retryLimit)) return retryLimit;
 
   console.error('Retry should be a non-negative integer.');
-  return DEFAULT_RETRY;
+  return DEFAULT_RETRY_LIMIT;
 };
 
 const getValidInterval = (config: PollerConfig = {}) => {
@@ -29,7 +30,7 @@ const getValidInterval = (config: PollerConfig = {}) => {
 
 type PollerConfig = {
   interval?: number;
-  retry?: number;
+  retryLimit?: number | null;
   runOnStart?: boolean;
 };
 
@@ -46,10 +47,10 @@ export type PollerInstance = {
  */
 export const Poller = (config?: PollerConfig): PollerInstance => {
   const runOnStart = Boolean(config?.runOnStart);
-  const retry = getValidRetry(config);
+  const retryLimit = getValidRetryLimit(config);
   const interval = getValidInterval(config);
 
-  if (!isInteger(retry) || retry < 0)
+  if (retryLimit !== null && (!isInteger(retryLimit) || retryLimit < 0))
     throw new Error('Retry must be a positive Integer.');
 
   let taskCount = 0;
@@ -85,7 +86,9 @@ export const Poller = (config?: PollerConfig): PollerInstance => {
           try {
             await resolvePromise(deleteTask, retryCounter.getValue);
           } catch (error) {
-            if (retryCounter.getValue() + 1 >= retry) {
+            // Never abort the task if retry is set as `null` on purpose.
+            if (retryLimit === null) return;
+            if (retryCounter.getValue() + 1 >= retryLimit) {
               removeAllEvents(taskId);
               tasks.delete(taskId);
               reject(error);
