@@ -1,6 +1,6 @@
 import { hasValue } from './utils/variable';
 import { CancelablePromise, makeCancelable } from './utils/promise';
-import { ResolvePromise, StopPollingFunction } from './types';
+import { ResolvePromise } from './types';
 import { RetryCounter } from './retry-counter';
 import { isInteger, isNonNegativeInteger } from './utils/number';
 
@@ -33,7 +33,18 @@ type PollerConfig = {
   runOnStart?: boolean;
 };
 
-export const Poller = (config?: PollerConfig) => {
+export type PollerInstance = {
+  add: <T = void>(resolvePromise: ResolvePromise<T>) => Promise<T>;
+  isIdling: () => boolean;
+  clear: () => void;
+};
+
+/**
+ * A factory that creates a Poller instance.
+ * @param config {Object} configure `interval`, `retry`, or `runOnStart`.
+ * @returns a poller instance, which you could add a task, clear all ongoing tasks, or check if there're any ongoing tasks.
+ */
+export const Poller = (config?: PollerConfig): PollerInstance => {
   const runOnStart = Boolean(config?.runOnStart);
   const retry = getValidRetry(config);
   const interval = getValidInterval(config);
@@ -41,44 +52,42 @@ export const Poller = (config?: PollerConfig) => {
   if (!isInteger(retry) || retry < 0)
     throw new Error('Retry must be a positive Integer.');
 
-  let promiseCount = 0;
-  let cancelablePromises: Record<string, CancelablePromise<unknown>> = {};
-  let eventRecords: Record<string, true> = {};
-  const removeEvent = (intervalId: number) => {
-    if (hasValue(eventRecords[intervalId])) {
-      window.clearInterval(intervalId);
-      delete eventRecords[intervalId];
-    }
-  };
+  let taskCount = 0;
+  const tasks = new Map<number, CancelablePromise<unknown>>();
+  const taskEventMapping = new Map<number, number>();
 
-  function poll(resolvePromise: ResolvePromise) {
-    promiseCount += 1;
-    const promiseKey = promiseCount;
-
-    const clean = (intervalId: number) => {
-      try {
-        delete cancelablePromises[promiseKey];
-        removeEvent(intervalId);
-      } catch (error) {}
+  function poll<T>(resolvePromise: ResolvePromise<T>) {
+    const removeAllEvents = (taskId: number) => {
+      if (taskEventMapping.has(taskId)) {
+        const eventId = taskEventMapping.get(taskId);
+        window.clearInterval(eventId);
+        taskEventMapping.delete(taskId);
+      }
     };
+
+    taskCount += 1;
+    const taskId = taskCount;
 
     const retryCounter = RetryCounter();
     const masterPromise = makeCancelable(
-      new Promise<void>(async (resolve, reject) => {
-        const stopPolling: StopPollingFunction = (isResolved = true) => {
-          clean(intervalId);
+      new Promise<T>(async (resolve, reject) => {
+        const deleteTask = (isResolved = true, resolvedValue: T) => {
+          removeAllEvents(taskId);
+          tasks.delete(taskId);
+
           if (isResolved) {
-            resolve();
+            resolve(resolvedValue);
           } else {
             reject('canceled');
           }
         };
         const runTask = async () => {
           try {
-            await resolvePromise(stopPolling, retryCounter.getValue);
+            await resolvePromise(deleteTask, retryCounter.getValue);
           } catch (error) {
             if (retryCounter.getValue() + 1 >= retry) {
-              clean(intervalId);
+              removeAllEvents(taskId);
+              tasks.delete(taskId);
               reject(error);
               return;
             }
@@ -86,30 +95,27 @@ export const Poller = (config?: PollerConfig) => {
           }
         };
         if (runOnStart) runTask();
-        const intervalId = window.setInterval(runTask, interval);
-        eventRecords[intervalId] = true;
+        const eventId = window.setInterval(runTask, interval);
+        taskEventMapping.set(taskId, eventId);
       })
     );
 
-    cancelablePromises[promiseKey] = masterPromise;
+    tasks.set(taskId, masterPromise);
     return masterPromise.promise;
   }
 
   return {
-    add: (resolvePromise: ResolvePromise) => poll(resolvePromise),
-    isIdling: () => Object.keys(eventRecords).length === 0,
-    clean: () => {
-      Object.values(cancelablePromises).forEach(promise => {
-        promise.cancel();
+    add: <T>(resolvePromise: ResolvePromise<T>): Promise<T> =>
+      poll<T>(resolvePromise),
+    isIdling: () => Object.keys(taskEventMapping).length === 0,
+    clear: () => {
+      taskEventMapping.forEach((eventId, taskId) => {
+        tasks.get(taskId)?.cancel();
+        window.clearInterval(eventId);
       });
-
-      Object.keys(eventRecords).forEach(intervalIdAsString => {
-        const intervalId = Number(intervalIdAsString);
-        window.clearInterval(intervalId);
-      });
-
-      eventRecords = {};
-      cancelablePromises = {};
+      taskEventMapping.clear();
+      tasks.clear();
+      taskCount = 0;
     },
   };
 };

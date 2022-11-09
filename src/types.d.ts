@@ -1,6 +1,4 @@
 export type ResolvePromise<T = unknown> = (
-  stopPolling: StopPollingFunction,
+  deleteTask: (isResolved?: boolean, resolvedValue: T) => void,
   getRetryCount: () => number
 ) => Promise<T>;
-
-export type StopPollingFunction = (isResolved: boolean) => void;
