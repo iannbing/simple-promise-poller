@@ -1,12 +1,6 @@
 import { hasValue } from './utils/variable';
 import { CancelablePromise, makeCancelable } from './utils/promise';
-import {
-  CancelTask,
-  PipeConfig,
-  PipeTask,
-  PollerConfig,
-  ResolvePromise,
-} from './types';
+import { CancelTask, PollerConfig, ResolvePromise, PipeConfig } from './types';
 import { RetryCounter } from './retry-counter';
 import { isNonNegativeInteger } from './utils/number';
 
@@ -23,7 +17,11 @@ export const Poller = (config?: PollerConfig) => {
   const tasks = new Map<number, CancelablePromise<unknown>>();
   const taskEventMapping = new Map<number, number>();
 
-  const poll = <T>(resolvePromise: ResolvePromise<T>, runOnStart?: boolean) => {
+  const poll = <T>(
+    resolvePromise: ResolvePromise<T>,
+    runOnStart?: boolean,
+    initialValue?: any
+  ) => {
     const clearEvents = (taskId: number) => {
       if (taskEventMapping.has(taskId)) {
         const eventId = taskEventMapping.get(taskId);
@@ -53,7 +51,8 @@ export const Poller = (config?: PollerConfig) => {
           try {
             cachedValue = await resolvePromise(
               cancelTask,
-              retryCounter.getValue
+              retryCounter.getValue,
+              initialValue
             );
           } catch (error) {
             // Never abort the task if retryLimit is set as `null` on purpose.
@@ -80,13 +79,18 @@ export const Poller = (config?: PollerConfig) => {
   return {
     poll,
     add: poll,
-    pipe: <T, R extends T>(...tasks: PipeTask<T>[]) => async (
+    pipe: <T, R extends T>(...tasks: ResolvePromise<T>[]) => async (
       config?: PipeConfig
     ) => {
-      const { runOnStart = false } = config || {};
+      const { runOnStart = false, initialValue } = config || {};
       const result = await tasks.reduce(async (prevTask, task) => {
         const previousResult = await prevTask;
-        return poll<T>(task(previousResult), runOnStart);
+        return poll<T>(
+          (cancelTask, getRetryCount) =>
+            task(cancelTask, getRetryCount, previousResult),
+          runOnStart,
+          initialValue
+        );
       }, Promise.resolve() as Promise<T | undefined | void>);
       return result as R;
     },

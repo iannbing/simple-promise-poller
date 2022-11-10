@@ -2,7 +2,8 @@ export type CancelTask<T = void> = (isResolved?: boolean, value?: T) => void;
 
 export type ResolvePromise<T = unknown> = (
   cancelTask: CancelTask<T>,
-  getRetryCount: () => number
+  getRetryCount: () => number,
+  initialValue?: any
 ) => Promise<T | undefined>;
 
 export type PollFunction = <T = void>(
@@ -15,5 +16,4 @@ export type PollerConfig = {
   retryLimit?: number | null;
 };
 
-export type PipeConfig = { runOnStart: boolean };
-export type PipeTask<T> = (result: any) => ResolvePromise<T>;
+export type PipeConfig = { runOnStart: boolean; initialValue?: any };

@@ -1,5 +1,10 @@
 import { Poller, PollerInstance } from './poller';
-import { ResolvePromise, CancelTask, PollFunction, PipeConfig } from './types';
+import {
+  ResolvePromise,
+  CancelTask,
+  PollFunction,
+  PollerConfig,
+} from './types';
 
 export {
   Poller,
@@ -7,6 +12,6 @@ export {
   ResolvePromise,
   CancelTask,
   PollFunction,
-  PipeConfig,
+  PollerConfig as PipeConfig,
 };
 export default Poller;
