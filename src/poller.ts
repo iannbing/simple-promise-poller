@@ -12,7 +12,7 @@ import { isNonNegativeInteger } from './utils/number';
 
 /**
  * A factory that creates a Poller instance.
- * @param config {Object} configure `interval`, `retry`, or `runOnStart`.
+ * @param config {Object} configure `interval` and `retryLimit`.
  * @returns a poller instance, which you could add a task, clear all ongoing tasks, or check if there're any ongoing tasks.
  */
 export const Poller = (config?: PollerConfig) => {
