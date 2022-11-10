@@ -37,7 +37,7 @@ export const Poller = (config?: PollerConfig) => {
 
     taskCount += 1;
     const taskId = taskCount;
-    let cachedValue: void | Awaited<T> | undefined;
+    let cachedValue: void | T | undefined;
 
     const retryCounter = RetryCounter();
     const masterPromise = makeCancelable(
@@ -88,8 +88,8 @@ export const Poller = (config?: PollerConfig) => {
       const result = await actualTasks.reduce(async (prevTask, task) => {
         const previousResult = await prevTask;
         return poll<any>(task(previousResult), runOnStart);
-      }, Promise.resolve() as Promise<T>);
-      return result as R;
+      }, (Promise.resolve() as unknown) as Promise<T>);
+      return (result as unknown) as R;
     },
     isIdling: () => Object.keys(taskEventMapping).length === 0,
     clear: () => {
@@ -128,15 +128,13 @@ const getValidInterval = (config: PollerConfig = {}) => {
   return DEFAULT_INTERVAL;
 };
 
-const processPipeArgs = <T>(
-  tasks: (PipeConfig | PipeTask<T>)[]
-): [PipeConfig, PipeTask<T>[]] => {
+const processPipeArgs = <T>(tasks: (PipeConfig | PipeTask<T>)[]) => {
   // Only the first one could be PipeConfig.
   if (tasks[0] instanceof Function) {
-    return [{ runOnStart: false }, tasks as PipeTask<T>[]];
+    return [{ runOnStart: false }, tasks as PipeTask<T>[]] as const;
   } else {
     const [config, ...actualTasks] = tasks;
-    return [config, actualTasks as PipeTask<T>[]];
+    return [config, actualTasks as PipeTask<T>[]] as const;
   }
 };
 
