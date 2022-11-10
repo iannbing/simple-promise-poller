@@ -34,11 +34,11 @@ export const Poller = (config?: PollerConfig) => {
 
     taskCount += 1;
     const taskId = taskCount;
-    let cachedValue: void | T | undefined;
+    let cachedValue: T | undefined;
 
     const retryCounter = RetryCounter();
     const masterPromise = makeCancelable(
-      new Promise<T | undefined | void>(async (resolve, reject) => {
+      new Promise<T | undefined>(async (resolve, reject) => {
         const cancelTask: CancelTask<T> = (isResolved, value) => {
           clearEvents(taskId);
           tasks.delete(taskId);
@@ -80,13 +80,15 @@ export const Poller = (config?: PollerConfig) => {
   return {
     poll,
     add: poll,
-    pipe: async <T = void, R = T>(...tasks: (PipeConfig | PipeTask<T>)[]) => {
-      const [{ runOnStart }, actualTasks] = processPipeArgs(tasks);
-      const result = await actualTasks.reduce(async (prevTask, task) => {
+    pipe: <T, R extends T>(...tasks: PipeTask<T>[]) => async (
+      config?: PipeConfig
+    ) => {
+      const { runOnStart = false } = config || {};
+      const result = await tasks.reduce(async (prevTask, task) => {
         const previousResult = await prevTask;
-        return poll<any>(task(previousResult), runOnStart);
-      }, (Promise.resolve() as unknown) as Promise<T>);
-      return (result as unknown) as R;
+        return poll<T | undefined>(task(previousResult), runOnStart);
+      }, Promise.resolve() as Promise<T | undefined>);
+      return result as R;
     },
     isIdling: () => Object.keys(taskEventMapping).length === 0,
     clear: () => {
@@ -126,16 +128,6 @@ const getValidInterval = (config: PollerConfig = {}) => {
 
   console.error('Interval should be a non-negative integer.');
   return DEFAULT_INTERVAL;
-};
-
-const processPipeArgs = <T>(tasks: (PipeConfig | PipeTask<T>)[]) => {
-  // Only the first one could be PipeConfig.
-  if (tasks[0] instanceof Function) {
-    return [{ runOnStart: false }, tasks as PipeTask<T>[]] as const;
-  } else {
-    const [config, ...actualTasks] = tasks;
-    return [config, actualTasks as PipeTask<T>[]] as const;
-  }
 };
 
 export type PollerInstance = ReturnType<typeof Poller>;
