@@ -1,4 +1,4 @@
-import { Poller } from '../src';
+import { CancelTask, Poller } from '../src';
 
 const errorMessage = (count: number) =>
   `stop polling after retry ${count} times.`;
@@ -23,26 +23,26 @@ describe('Poller', () => {
     expect(mockCallback).toHaveBeenCalledTimes(10);
   });
 
-  it('should stop polling and resolve the master promise when deleteTask is called without giving input.', async () => {
+  it('should stop polling and resolve the master promise when cancelTask is called without giving input.', async () => {
     const times = 8;
 
     let counter = 0;
-    const mockCallback = jest.fn(async deleteTask => {
+    const mockCallback = jest.fn(async (cancelTask: CancelTask<number>) => {
       counter += 1;
-      if (counter >= times) deleteTask();
+      if (counter >= times) cancelTask();
     });
 
     await poller.add(mockCallback);
     expect(mockCallback).toHaveBeenCalledTimes(times);
   });
 
-  it('should stop polling and result in a rejection when deleteTask is called with false.', async () => {
+  it('should stop polling and result in a rejection when cancelTask is called with false.', async () => {
     const times = 8;
 
     let counter = 0;
-    const mockCallback = jest.fn(async deleteTask => {
+    const mockCallback = jest.fn(async cancelTask => {
       counter += 1;
-      if (counter >= times) deleteTask(false);
+      if (counter >= times) cancelTask(false);
     });
 
     try {
@@ -52,7 +52,7 @@ describe('Poller', () => {
     }
   });
 
-  it('should stop and delete all tasks when poller.clear is called.', async () => {
+  it('should stop and clear all tasks when `poller.clear` is called.', async () => {
     const taskCount = 8;
 
     let counter = 0;
@@ -70,4 +70,7 @@ describe('Poller', () => {
       [...Array(taskCount)].map(() => poller.add(mockCallback))
     );
   });
+
+  // TODO: poller.pipe
+  // TODO: value passed to cancelTask will be the final resolved value, if not, tha last resolved value of resolvePromise.
 });

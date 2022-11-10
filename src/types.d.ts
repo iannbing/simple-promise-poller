@@ -5,14 +5,10 @@ export type ResolvePromise<T = unknown> = (
   getRetryCount: () => number
 ) => Promise<T | undefined | void>;
 
-export type PollerInstance = {
-  add: <T = void>(task: ResolvePromise<T>) => Promise<void | T | undefined>;
-  pipe: <T = void, R = T>(
-    ...tasks: (PipeConfig | PipeTask<T>)[]
-  ) => Promise<R | undefined>;
-  isIdling: () => boolean;
-  clear: () => void;
-};
+export type PollFunction = <T = void>(
+  task: ResolvePromise<T>,
+  runOnStart?: boolean
+) => Promise<void | T | undefined>;
 
 export type PollerConfig = {
   interval?: number;
