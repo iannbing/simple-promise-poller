@@ -1,6 +1,6 @@
 import { hasValue } from './utils/variable';
 import { CancelablePromise, makeCancelable } from './utils/promise';
-import { ResolvePromise } from './types';
+import { CancelTask, ResolvePromise } from './types';
 import { RetryCounter } from './retry-counter';
 import { isInteger, isNonNegativeInteger } from './utils/number';
 
@@ -35,7 +35,12 @@ type PollerConfig = {
 };
 
 export type PollerInstance = {
-  add: <T = void>(resolvePromise: ResolvePromise<T>) => Promise<T>;
+  add: <T = void>(
+    resolvePromise: ResolvePromise<T>
+  ) => Promise<T | undefined | void>;
+  pipe: <T = void>(
+    ...tasks: ((result: any) => ResolvePromise<T>)[]
+  ) => Promise<T | undefined>;
   isIdling: () => boolean;
   clear: () => void;
 };
@@ -58,7 +63,7 @@ export const Poller = (config?: PollerConfig): PollerInstance => {
   const taskEventMapping = new Map<number, number>();
 
   function poll<T>(resolvePromise: ResolvePromise<T>) {
-    const removeAllEvents = (taskId: number) => {
+    const clearEvents = (taskId: number) => {
       if (taskEventMapping.has(taskId)) {
         const eventId = taskEventMapping.get(taskId);
         window.clearInterval(eventId);
@@ -68,28 +73,32 @@ export const Poller = (config?: PollerConfig): PollerInstance => {
 
     taskCount += 1;
     const taskId = taskCount;
+    let cachedValue: void | Awaited<T> | undefined;
 
     const retryCounter = RetryCounter();
     const masterPromise = makeCancelable(
-      new Promise<T>(async (resolve, reject) => {
-        const deleteTask = (isResolved = true, resolvedValue: T) => {
-          removeAllEvents(taskId);
+      new Promise<T | undefined | void>(async (resolve, reject) => {
+        const deleteTask: CancelTask<T> = (isResolved, value) => {
+          clearEvents(taskId);
           tasks.delete(taskId);
 
           if (isResolved) {
-            resolve(resolvedValue);
+            resolve(value || cachedValue);
           } else {
             reject('canceled');
           }
         };
         const runTask = async () => {
           try {
-            await resolvePromise(deleteTask, retryCounter.getValue);
+            cachedValue = await resolvePromise(
+              deleteTask,
+              retryCounter.getValue
+            );
           } catch (error) {
             // Never abort the task if retry is set as `null` on purpose.
             if (retryLimit === null) return;
             if (retryCounter.getValue() + 1 >= retryLimit) {
-              removeAllEvents(taskId);
+              clearEvents(taskId);
               tasks.delete(taskId);
               reject(error);
               return;
@@ -108,8 +117,16 @@ export const Poller = (config?: PollerConfig): PollerInstance => {
   }
 
   return {
-    add: <T>(resolvePromise: ResolvePromise<T>): Promise<T> =>
-      poll<T>(resolvePromise),
+    add: <T = void>(task: ResolvePromise<T>): Promise<T | undefined | void> =>
+      poll<T>(task),
+    pipe: async <T = void>(
+      ...tasks: ((result: any) => ResolvePromise<T>)[]
+    ) => {
+      return tasks.reduce(async (prevTask, task) => {
+        const previousResult = await prevTask;
+        return poll<any>(task(previousResult));
+      }, Promise.resolve() as Promise<T>);
+    },
     isIdling: () => Object.keys(taskEventMapping).length === 0,
     clear: () => {
       taskEventMapping.forEach((eventId, taskId) => {

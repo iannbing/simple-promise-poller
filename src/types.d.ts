@@ -1,4 +1,6 @@
+export type CancelTask<T> = (isResolved?: boolean, value?: T) => void;
+
 export type ResolvePromise<T = unknown> = (
-  deleteTask: (isResolved?: boolean, resolvedValue: T) => void,
+  cancelTask: CancelTask<T>,
   getRetryCount: () => number
-) => Promise<T>;
+) => Promise<T | undefined | void>;

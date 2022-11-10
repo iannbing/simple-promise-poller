@@ -1,5 +1,5 @@
 import { Poller, PollerInstance } from './poller';
-import { ResolvePromise } from './types';
+import { ResolvePromise, CancelTask } from './types';
 
-export { Poller, PollerInstance, ResolvePromise };
-export default PollerInstance;
+export { Poller, PollerInstance, ResolvePromise, CancelTask };
+export default Poller;
