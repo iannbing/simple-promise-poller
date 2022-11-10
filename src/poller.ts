@@ -34,11 +34,11 @@ export const Poller = (config?: PollerConfig) => {
 
     taskCount += 1;
     const taskId = taskCount;
-    let cachedValue: T | undefined;
+    let cachedValue: T | undefined | void;
 
     const retryCounter = RetryCounter();
     const masterPromise = makeCancelable(
-      new Promise<T | undefined>(async (resolve, reject) => {
+      new Promise<T | undefined | void>(async (resolve, reject) => {
         const cancelTask: CancelTask<T> = (isResolved, value) => {
           clearEvents(taskId);
           tasks.delete(taskId);
@@ -86,8 +86,8 @@ export const Poller = (config?: PollerConfig) => {
       const { runOnStart = false } = config || {};
       const result = await tasks.reduce(async (prevTask, task) => {
         const previousResult = await prevTask;
-        return poll<T | undefined>(task(previousResult), runOnStart);
-      }, Promise.resolve() as Promise<T | undefined>);
+        return poll<T>(task(previousResult), runOnStart);
+      }, Promise.resolve() as Promise<T | undefined | void>);
       return result as R;
     },
     isIdling: () => Object.keys(taskEventMapping).length === 0,

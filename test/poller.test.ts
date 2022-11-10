@@ -27,7 +27,7 @@ describe('Poller', () => {
     const times = 8;
 
     let counter = 0;
-    const mockCallback = jest.fn(async (cancelTask: CancelTask<number>) => {
+    const mockCallback = jest.fn(async (cancelTask: CancelTask) => {
       counter += 1;
       if (counter >= times) cancelTask();
     });

@@ -1,4 +1,4 @@
-export type CancelTask<T> = (isResolved?: boolean, value?: T) => void;
+export type CancelTask<T = void> = (isResolved?: boolean, value?: T) => void;
 
 export type ResolvePromise<T = unknown> = (
   cancelTask: CancelTask<T>,
