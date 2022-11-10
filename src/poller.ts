@@ -8,7 +8,7 @@ import {
   ResolvePromise,
 } from './types';
 import { RetryCounter } from './retry-counter';
-import { isInteger, isNonNegativeInteger } from './utils/number';
+import { isNonNegativeInteger } from './utils/number';
 
 /**
  * A factory that creates a Poller instance.
@@ -18,9 +18,6 @@ import { isInteger, isNonNegativeInteger } from './utils/number';
 export const Poller = (config?: PollerConfig) => {
   const retryLimit = getValidRetryLimit(config);
   const interval = getValidInterval(config);
-
-  if (retryLimit !== null && (!isInteger(retryLimit) || retryLimit < 0))
-    throw new Error('Retry must be a positive Integer.');
 
   let taskCount = 0;
   const tasks = new Map<number, CancelablePromise<unknown>>();
@@ -59,7 +56,7 @@ export const Poller = (config?: PollerConfig) => {
               retryCounter.getValue
             );
           } catch (error) {
-            // Never abort the task if retry is set as `null` on purpose.
+            // Never abort the task if retryLimit is set as `null` on purpose.
             if (retryLimit === null) return;
             if (retryCounter.getValue() + 1 >= retryLimit) {
               clearEvents(taskId);
@@ -114,7 +111,10 @@ const getValidRetryLimit = (config: PollerConfig | undefined) => {
   if (!hasValue(retryLimit)) return DEFAULT_RETRY_LIMIT;
   if (isNonNegativeInteger(retryLimit)) return retryLimit;
 
-  console.error('Retry should be a non-negative integer.');
+  console.error(
+    '`retryLimit` should be null or a non-negative integer. ' +
+      `Use default value ${DEFAULT_RETRY_LIMIT} instead.`
+  );
   return DEFAULT_RETRY_LIMIT;
 };
 
