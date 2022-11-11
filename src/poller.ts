@@ -44,6 +44,7 @@ export const Poller = (config?: PollerConfig) => {
 
           if (isResolved === undefined || isResolved) {
             resolve(value || cachedValue);
+            return value || cachedValue;
           } else {
             reject('canceled');
           }
@@ -86,10 +87,9 @@ export const Poller = (config?: PollerConfig) => {
       return poll<T>(
         (cancelTask, getRetryCount) =>
           task(cancelTask, getRetryCount, previousResult),
-        runOnStart,
-        initialValue
+        runOnStart
       );
-    }, Promise.resolve() as Promise<T | undefined | void>);
+    }, Promise.resolve(initialValue) as Promise<T | undefined | void>);
     return result as R;
   };
 
