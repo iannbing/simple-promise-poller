@@ -103,7 +103,7 @@ export const Poller = (config?: PollerConfig) => {
     taskCount = 0;
   };
 
-  const isIdling = () => Object.keys(taskEventMapping).length === 0;
+  const isIdling = () => taskEventMapping.size === 0;
 
   return { poll, add: poll, pipe, isIdling, clear };
 };

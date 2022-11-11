@@ -22,10 +22,11 @@ describe('Poller', () => {
     } catch (error) {
       expect(String(error)).toEqual(`Error: ${errorMessage(10)}`);
     }
+    expect(poller.isIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(10);
   });
 
-  it('should stop polling and resolve the master promise when cancelTask is called without giving input.', async () => {
+  it('should stop polling and resolve the master promise when cancelTask is called without any input.', async () => {
     const times = getRandomNumber();
 
     let counter = 0;
@@ -34,7 +35,13 @@ describe('Poller', () => {
       if (counter >= times) cancelTask();
     });
 
+    setTimeout(() => {
+      expect(poller.isIdling()).toBe(false);
+    }, 1);
+
     await poller.add(mockCallback);
+    expect(poller.isIdling()).toBe(true);
+
     expect(mockCallback).toHaveBeenCalledTimes(times);
   });
 
@@ -42,16 +49,21 @@ describe('Poller', () => {
     const times = getRandomNumber();
 
     let counter = 0;
-    const mockCallback = jest.fn(async cancelTask => {
+    const mockCallback = jest.fn(async (cancelTask: CancelTask<number>) => {
       counter += 1;
-      if (counter >= times) cancelTask(false);
+      return counter >= times ? cancelTask(false) : counter;
     });
+
+    setTimeout(() => {
+      expect(poller.isIdling()).toBe(false);
+    }, 1);
 
     try {
       await poller.add(mockCallback);
     } catch (error) {
-      expect(mockCallback).toHaveBeenCalledTimes(times);
+      expect(error).toEqual('canceled');
     }
+    expect(mockCallback).toHaveBeenCalledTimes(times);
   });
 
   it('should stop and clear all tasks when `poller.clear` is called.', async () => {
@@ -64,9 +76,10 @@ describe('Poller', () => {
     });
 
     setTimeout(() => {
+      expect(poller.isIdling()).toBe(false);
       poller.clear();
       expect(poller.isIdling()).toBe(true);
-    }, 3);
+    }, 100);
 
     await Promise.allSettled(
       [...Array(taskCount)].map(() => poller.add(mockCallback))
@@ -82,7 +95,12 @@ describe('Poller', () => {
       return counter >= times ? cancelTask() : counter;
     });
 
+    setTimeout(() => {
+      expect(poller.isIdling()).toBe(false);
+    }, 1);
+
     const value = await poller.add(mockCallback);
+    expect(poller.isIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(times);
     expect(value).toEqual(times - 1);
   });
@@ -96,7 +114,12 @@ describe('Poller', () => {
       return counter >= times ? cancelTask(true, 100) : counter;
     });
 
+    setTimeout(() => {
+      expect(poller.isIdling()).toBe(false);
+    }, 1);
+
     const value = await poller.add(mockCallback);
+    expect(poller.isIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(times);
     expect(value).toEqual(100);
   });
@@ -110,6 +133,10 @@ describe('Poller', () => {
       return counter >= times ? cancelTask(false, 100) : counter;
     });
 
+    setTimeout(() => {
+      expect(poller.isIdling()).toBe(false);
+    }, 1);
+
     let value: any;
     try {
       value = await poller.add(mockCallback);
@@ -117,10 +144,11 @@ describe('Poller', () => {
       expect(mockCallback).toHaveBeenCalledTimes(times);
       expect(error).toEqual('canceled');
     }
+    expect(poller.isIdling()).toBe(true);
     expect(value).toBeUndefined();
   });
 
-  it('.pipe should work', async () => {
+  it('.pipe should execute the tasks sequentially.', async () => {
     const times1 = getRandomNumber();
 
     let counter1 = 0;
@@ -151,11 +179,17 @@ describe('Poller', () => {
       }
     );
 
+    setTimeout(() => {
+      expect(poller.isIdling()).toBe(false);
+    }, 1);
+
     const initialValue = getRandomNumber();
     const value = await poller.pipe(
       mockCallback1,
       mockCallback2
     )({ initialValue });
+
+    expect(poller.isIdling()).toBe(true);
 
     expect(mockCallback1).toHaveBeenCalledTimes(times1);
     expect(mockCallback2).toHaveBeenCalledTimes(times2);
