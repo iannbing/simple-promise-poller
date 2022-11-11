@@ -3,7 +3,8 @@ import { CancelTask, Poller } from '../src';
 const errorMessage = (count: number) =>
   `stop polling after retry ${count} times.`;
 
-const getRandomNumber = () => Math.floor(5 + Math.random() * 5);
+const getRandomNumber = (min = 5, max = 9) =>
+  Math.floor(min + Math.random() * (max - min + 1));
 
 describe('Poller', () => {
   const poller = Poller({ interval: 1 });
@@ -24,6 +25,26 @@ describe('Poller', () => {
     }
     expect(poller.isIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(10);
+  });
+
+  it('should reset retry count if one task promise is resolved.', async () => {
+    const resetAtCount = getRandomNumber();
+    let shouldResolve = true;
+    const mockCallback = jest.fn(async (_, getRetryCount) => {
+      if (getRetryCount() === resetAtCount && shouldResolve) {
+        shouldResolve = false;
+        return;
+      }
+      throw new Error(errorMessage(getRetryCount() + 1));
+    });
+
+    try {
+      await poller.add(mockCallback);
+    } catch (error) {
+      expect(String(error)).toEqual(`Error: ${errorMessage(10)}`);
+    }
+    expect(poller.isIdling()).toBe(true);
+    expect(mockCallback).toHaveBeenCalledTimes(10 + resetAtCount + 1);
   });
 
   it('should stop polling and resolve the master promise when cancelTask is called without any input.', async () => {

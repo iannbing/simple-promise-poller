@@ -56,6 +56,7 @@ export const Poller = (config?: PollerConfig) => {
               retryCounter.getValue,
               initialValue
             );
+            retryCounter.reset();
           } catch (error) {
             // Never abort the task if retryLimit is set as `null` on purpose.
             if (retryLimit === null) return;
