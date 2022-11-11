@@ -1,12 +1,13 @@
 import { hasValue } from './utils/variable';
 import { CancelablePromise, makeCancelable } from './utils/promise';
-import { CancelTask, PollerConfig, ResolvePromise, PipeConfig } from './types';
+import { CancelTask, PollerConfig, AsyncTask, PipeConfig } from './types';
 import { RetryCounter } from './retry-counter';
 import { isNonNegativeInteger } from './utils/number';
+import { DEFAULT_INTERVAL, DEFAULT_RETRY_LIMIT } from './consts';
 
 /**
  * A factory that creates a Poller instance.
- * @param config {Object} configure `interval` and `retryLimit`.
+ * @param config {PollerConfig} configure `interval` and `retryLimit`.
  * @returns a poller instance, which you could add a task, clear all ongoing tasks, or check if there're any ongoing tasks.
  */
 export const Poller = (config?: PollerConfig) => {
@@ -18,7 +19,7 @@ export const Poller = (config?: PollerConfig) => {
   const taskEventMapping = new Map<number, number>();
 
   const poll = <T>(
-    resolvePromise: ResolvePromise<T>,
+    task: AsyncTask<T>,
     runOnStart?: boolean,
     initialValue?: any
   ) => {
@@ -49,7 +50,7 @@ export const Poller = (config?: PollerConfig) => {
         };
         const runTask = async () => {
           try {
-            cachedValue = await resolvePromise(
+            cachedValue = await task(
               cancelTask,
               retryCounter.getValue,
               initialValue
@@ -76,39 +77,36 @@ export const Poller = (config?: PollerConfig) => {
     return masterPromise.promise;
   };
 
-  return {
-    poll,
-    add: poll,
-    pipe: <T, R extends T>(...tasks: ResolvePromise<T>[]) => async (
-      config?: PipeConfig
-    ) => {
-      const { runOnStart = false, initialValue } = config || {};
-      const result = await tasks.reduce(async (prevTask, task) => {
-        const previousResult = await prevTask;
-        return poll<T>(
-          (cancelTask, getRetryCount) =>
-            task(cancelTask, getRetryCount, previousResult),
-          runOnStart,
-          initialValue
-        );
-      }, Promise.resolve() as Promise<T | undefined | void>);
-      return result as R;
-    },
-    isIdling: () => Object.keys(taskEventMapping).length === 0,
-    clear: () => {
-      taskEventMapping.forEach((eventId, taskId) => {
-        tasks.get(taskId)?.cancel();
-        window.clearInterval(eventId);
-      });
-      taskEventMapping.clear();
-      tasks.clear();
-      taskCount = 0;
-    },
+  const pipe = <T, R extends T>(...tasks: AsyncTask<T>[]) => async (
+    config?: PipeConfig
+  ) => {
+    const { runOnStart = false, initialValue } = config || {};
+    const result = await tasks.reduce(async (prevTask, task) => {
+      const previousResult = await prevTask;
+      return poll<T>(
+        (cancelTask, getRetryCount) =>
+          task(cancelTask, getRetryCount, previousResult),
+        runOnStart,
+        initialValue
+      );
+    }, Promise.resolve() as Promise<T | undefined | void>);
+    return result as R;
   };
-};
 
-const DEFAULT_INTERVAL = 2000;
-const DEFAULT_RETRY_LIMIT = 10;
+  const clear = () => {
+    taskEventMapping.forEach((eventId, taskId) => {
+      tasks.get(taskId)?.cancel();
+      window.clearInterval(eventId);
+    });
+    taskEventMapping.clear();
+    tasks.clear();
+    taskCount = 0;
+  };
+
+  const isIdling = () => Object.keys(taskEventMapping).length === 0;
+
+  return { poll, add: poll, pipe, isIdling, clear };
+};
 
 const getValidRetryLimit = (config: PollerConfig | undefined) => {
   const retryLimit = config?.retryLimit;

@@ -1,17 +1,12 @@
 import { Poller, PollerInstance } from './poller';
-import {
-  ResolvePromise,
-  CancelTask,
-  PollFunction,
-  PollerConfig,
-} from './types';
+import { AsyncTask, CancelTask, PollerConfig, PipeConfig } from './types';
 
 export {
   Poller,
-  PollerInstance,
-  ResolvePromise,
+  AsyncTask,
   CancelTask,
-  PollFunction,
-  PollerConfig as PipeConfig,
+  PollerInstance,
+  PollerConfig,
+  PipeConfig,
 };
 export default Poller;
