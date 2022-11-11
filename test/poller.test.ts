@@ -61,7 +61,7 @@ describe('Poller', () => {
       return counter;
     });
 
-    window.setTimeout(() => {
+    setTimeout(() => {
       poller.clear();
       expect(poller.isIdling()).toBe(true);
     }, 3);

@@ -16,7 +16,7 @@ export const Poller = (config?: PollerConfig) => {
 
   let taskCount = 0;
   const tasks = new Map<number, CancelablePromise<unknown>>();
-  const taskEventMapping = new Map<number, number>();
+  const taskEventMapping = new Map<number, number | NodeJS.Timer>();
 
   const poll = <T>(
     task: AsyncTask<T>,
@@ -26,7 +26,7 @@ export const Poller = (config?: PollerConfig) => {
     const clearEvents = (taskId: number) => {
       if (taskEventMapping.has(taskId)) {
         const eventId = taskEventMapping.get(taskId);
-        window.clearInterval(eventId);
+        clearInterval(eventId);
         taskEventMapping.delete(taskId);
       }
     };
@@ -68,7 +68,7 @@ export const Poller = (config?: PollerConfig) => {
           }
         };
         if (runOnStart) runTask();
-        const eventId = window.setInterval(runTask, interval);
+        const eventId = setInterval(runTask, interval);
         taskEventMapping.set(taskId, eventId);
       })
     );
