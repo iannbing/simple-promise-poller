@@ -1,5 +1,5 @@
 import { Poller, PollerInstance } from './poller';
-import { AsyncTask, CancelTask, PollerConfig, PipeConfig } from './types';
+import { AsyncTask, CancelTask, PollerConfig, TaskConfig } from './types';
 
 export {
   Poller,
@@ -7,6 +7,6 @@ export {
   CancelTask,
   PollerInstance,
   PollerConfig,
-  PipeConfig,
+  TaskConfig,
 };
 export default Poller;
