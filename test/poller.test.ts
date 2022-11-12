@@ -70,10 +70,12 @@ describe('Poller', () => {
     const times = getRandomNumber();
 
     let counter = 0;
-    const mockCallback = jest.fn(async (cancelTask: CancelTask<number>) => {
-      counter += 1;
-      return counter >= times ? cancelTask(false) : counter;
-    });
+    const mockCallback = jest.fn(
+      async (cancelTask: CancelTask<string | number>) => {
+        counter += 1;
+        return counter >= times ? cancelTask(false, 'task failed') : counter;
+      }
+    );
 
     setTimeout(() => {
       expect(poller.isIdling()).toBe(false);
@@ -82,7 +84,7 @@ describe('Poller', () => {
     try {
       await poller.add(mockCallback);
     } catch (error) {
-      expect(error).toEqual('canceled');
+      expect(error).toEqual('task failed');
     }
     expect(mockCallback).toHaveBeenCalledTimes(times);
   });
@@ -151,7 +153,7 @@ describe('Poller', () => {
     let counter = 0;
     const mockCallback = jest.fn(async (cancelTask: CancelTask<number>) => {
       counter += 1;
-      return counter >= times ? cancelTask(false, 100) : counter;
+      return counter >= times ? cancelTask(false) : counter;
     });
 
     setTimeout(() => {
@@ -163,7 +165,7 @@ describe('Poller', () => {
       value = await poller.add(mockCallback);
     } catch (error) {
       expect(mockCallback).toHaveBeenCalledTimes(times);
-      expect(error).toEqual('canceled');
+      expect(error).toEqual(times - 1);
     }
     expect(poller.isIdling()).toBe(true);
     expect(value).toBeUndefined();

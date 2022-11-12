@@ -1,6 +1,6 @@
 import { hasValue } from './utils/variable';
 import { CancelablePromise, makeCancelable } from './utils/promise';
-import { CancelTask, PollerConfig, AsyncTask, PipeConfig } from './types';
+import { CancelTask, PollerConfig, AsyncTask, TaskConfig } from './types';
 import { RetryCounter } from './retry-counter';
 import { isNonNegativeInteger } from './utils/number';
 import { DEFAULT_INTERVAL, DEFAULT_RETRY_LIMIT } from './consts';
@@ -11,18 +11,11 @@ import { DEFAULT_INTERVAL, DEFAULT_RETRY_LIMIT } from './consts';
  * @returns a poller instance, which you could add a task, clear all ongoing tasks, or check if there're any ongoing tasks.
  */
 export const Poller = (config?: PollerConfig) => {
-  const retryLimit = getValidRetryLimit(config);
-  const interval = getValidInterval(config);
-
   let taskCount = 0;
   const tasks = new Map<number, CancelablePromise<unknown>>();
   const taskEventMapping = new Map<number, number | NodeJS.Timer>();
 
-  const poll = <T>(
-    task: AsyncTask<T>,
-    runOnStart?: boolean,
-    initialValue?: any
-  ) => {
+  const poll = <T>(task: AsyncTask<T>, taskConfig?: TaskConfig) => {
     const clearEvents = (taskId: number) => {
       if (taskEventMapping.has(taskId)) {
         const eventId = taskEventMapping.get(taskId);
@@ -46,7 +39,7 @@ export const Poller = (config?: PollerConfig) => {
             resolve(value || cachedValue);
             return value || cachedValue;
           } else {
-            reject('canceled');
+            reject(value || cachedValue || 'canceled');
           }
         };
         const runTask = async () => {
@@ -54,11 +47,16 @@ export const Poller = (config?: PollerConfig) => {
             cachedValue = await task(
               cancelTask,
               retryCounter.getValue,
-              initialValue
+              taskConfig?.initialValue
             );
             retryCounter.reset();
           } catch (error) {
             // Never abort the task if retryLimit is set as `null` on purpose.
+            const retryLimit = getValidRetryLimit(
+              taskConfig?.retryLimit !== undefined
+                ? taskConfig?.retryLimit
+                : config?.retryLimit
+            );
             if (retryLimit === null) return;
             if (retryCounter.getValue() + 1 >= retryLimit) {
               clearEvents(taskId);
@@ -69,7 +67,10 @@ export const Poller = (config?: PollerConfig) => {
             retryCounter.increment();
           }
         };
-        if (runOnStart) runTask();
+        if (taskConfig?.runOnStart || config?.runOnStart) runTask();
+        const interval = getValidInterval(
+          taskConfig?.interval ?? config?.interval
+        );
         const eventId = setInterval(runTask, interval);
         taskEventMapping.set(taskId, eventId);
       })
@@ -80,15 +81,15 @@ export const Poller = (config?: PollerConfig) => {
   };
 
   const pipe = <T, R extends T>(...tasks: AsyncTask<T>[]) => async (
-    config?: PipeConfig
+    config?: TaskConfig
   ) => {
-    const { runOnStart = false, initialValue } = config || {};
+    const { initialValue, ...pipeConfig } = config || {};
     const result = await tasks.reduce(async (prevTask, task) => {
       const previousResult = await prevTask;
       return poll<T>(
         (cancelTask, getRetryCount) =>
           task(cancelTask, getRetryCount, previousResult),
-        runOnStart
+        pipeConfig
       );
     }, Promise.resolve(initialValue) as Promise<T | undefined | void>);
     return result as R;
@@ -109,9 +110,7 @@ export const Poller = (config?: PollerConfig) => {
   return { poll, add: poll, pipe, isIdling, clear };
 };
 
-const getValidRetryLimit = (config: PollerConfig | undefined) => {
-  const retryLimit = config?.retryLimit;
-
+const getValidRetryLimit = (retryLimit: number | null | undefined) => {
   if (retryLimit === null) return null;
   if (!hasValue(retryLimit)) return DEFAULT_RETRY_LIMIT;
   if (isNonNegativeInteger(retryLimit)) return retryLimit;
@@ -123,11 +122,9 @@ const getValidRetryLimit = (config: PollerConfig | undefined) => {
   return DEFAULT_RETRY_LIMIT;
 };
 
-const getValidInterval = (config: PollerConfig = {}) => {
-  const intervalConfig = config?.interval;
-
-  if (!hasValue(intervalConfig)) return DEFAULT_INTERVAL;
-  if (isNonNegativeInteger(intervalConfig)) return intervalConfig;
+const getValidInterval = (interval: number | undefined) => {
+  if (!hasValue(interval)) return DEFAULT_INTERVAL;
+  if (isNonNegativeInteger(interval)) return interval;
 
   console.error('Interval should be a non-negative integer.');
   return DEFAULT_INTERVAL;

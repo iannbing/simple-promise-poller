@@ -12,6 +12,9 @@ export type AsyncTask<T = unknown> = (
 export type PollerConfig = {
   interval?: number;
   retryLimit?: number | null;
+  runOnStart?: boolean;
 };
 
-export type PipeConfig = { runOnStart?: boolean; initialValue?: any };
+export type TaskConfig = PollerConfig & {
+  initialValue?: any;
+};
