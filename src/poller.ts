@@ -10,7 +10,7 @@ import { DEFAULT_INTERVAL, DEFAULT_RETRY_LIMIT } from './consts';
  * @param config {PollerConfig} configure `interval` and `retryLimit`.
  * @returns a poller instance, which you could add a task, clear all ongoing tasks, or check if there're any ongoing tasks.
  */
-export const Poller = (config?: PollerConfig) => {
+export const createPoller = (config?: PollerConfig) => {
   let taskCount = 0;
   const tasks = new Map<number, CancelablePromise<unknown>>();
   const taskEventMapping = new Map<number, number | NodeJS.Timer>();
@@ -107,7 +107,7 @@ export const Poller = (config?: PollerConfig) => {
 
   const isIdling = () => taskEventMapping.size === 0;
 
-  return { poll, add: poll, pipe, isIdling, clear };
+  return { poll, pipe, isIdling, clear };
 };
 
 const getValidRetryLimit = (retryLimit: number | null | undefined) => {
@@ -130,4 +130,4 @@ const getValidInterval = (interval: number | undefined) => {
   return DEFAULT_INTERVAL;
 };
 
-export type PollerInstance = ReturnType<typeof Poller>;
+export type PollerInstance = ReturnType<typeof createPoller>;

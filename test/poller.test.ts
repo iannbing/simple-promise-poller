@@ -1,4 +1,4 @@
-import { CancelTask, Poller } from '../src';
+import { CancelTask, createPoller } from '../src';
 
 const errorMessage = (count: number) =>
   `stop polling after retry ${count} times.`;
@@ -7,7 +7,7 @@ const getRandomNumber = (min = 5, max = 9) =>
   Math.floor(min + Math.random() * (max - min + 1));
 
 describe('Poller', () => {
-  const poller = Poller({ interval: 1 });
+  const poller = createPoller({ interval: 1 });
   beforeEach(async () => {
     poller.clear();
     expect(poller.isIdling()).toBe(true);
@@ -19,7 +19,7 @@ describe('Poller', () => {
     });
 
     try {
-      await poller.add(mockCallback);
+      await poller.poll(mockCallback);
     } catch (error) {
       expect(String(error)).toEqual(`Error: ${errorMessage(10)}`);
     }
@@ -39,7 +39,7 @@ describe('Poller', () => {
     });
 
     try {
-      await poller.add(mockCallback);
+      await poller.poll(mockCallback);
     } catch (error) {
       expect(String(error)).toEqual(`Error: ${errorMessage(10)}`);
     }
@@ -60,7 +60,7 @@ describe('Poller', () => {
       expect(poller.isIdling()).toBe(false);
     }, 1);
 
-    await poller.add(mockCallback);
+    await poller.poll(mockCallback);
     expect(poller.isIdling()).toBe(true);
 
     expect(mockCallback).toHaveBeenCalledTimes(times);
@@ -82,7 +82,7 @@ describe('Poller', () => {
     }, 1);
 
     try {
-      await poller.add(mockCallback);
+      await poller.poll(mockCallback);
     } catch (error) {
       expect(error).toEqual('task failed');
     }
@@ -105,7 +105,7 @@ describe('Poller', () => {
     }, 100);
 
     await Promise.allSettled(
-      [...Array(taskCount)].map(() => poller.add(mockCallback))
+      [...Array(taskCount)].map(() => poller.poll(mockCallback))
     );
   });
 
@@ -122,7 +122,7 @@ describe('Poller', () => {
       expect(poller.isIdling()).toBe(false);
     }, 1);
 
-    const value = await poller.add(mockCallback);
+    const value = await poller.poll(mockCallback);
     expect(poller.isIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(times);
     expect(value).toEqual(times - 1);
@@ -141,7 +141,7 @@ describe('Poller', () => {
       expect(poller.isIdling()).toBe(false);
     }, 1);
 
-    const value = await poller.add(mockCallback);
+    const value = await poller.poll(mockCallback);
     expect(poller.isIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(times);
     expect(value).toEqual(100);
@@ -162,7 +162,7 @@ describe('Poller', () => {
 
     let value: any;
     try {
-      value = await poller.add(mockCallback);
+      value = await poller.poll(mockCallback);
     } catch (error) {
       expect(mockCallback).toHaveBeenCalledTimes(times);
       expect(error).toEqual(times - 1);
