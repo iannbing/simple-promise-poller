@@ -1,11 +1,12 @@
 import { createPoller, PollerInstance } from './poller';
-import { AsyncTask, CancelTask, PollerConfig, TaskConfig } from './types';
+import { AsyncTask, CancelTask, PollerConfig, TaskOption } from './types';
 
 const {
   poll,
   pipe,
-  clear: clearTasks,
+  clear: clearAllTasks,
   isIdling: isPollerIdling,
+  setConfig,
 } = createPoller();
 
 export {
@@ -14,10 +15,11 @@ export {
   CancelTask,
   PollerInstance,
   PollerConfig,
-  TaskConfig,
+  TaskOption,
   poll,
   pipe,
-  clearTasks,
+  clearAllTasks,
   isPollerIdling,
+  setConfig,
 };
 export default createPoller;

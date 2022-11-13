@@ -9,12 +9,11 @@ export type AsyncTask<T = unknown> = (
   initialValue?: any
 ) => Promise<T | undefined | void>;
 
-export type PollerConfig = {
+export type TaskOption = {
   interval?: number;
   retryLimit?: number | null;
   runOnStart?: boolean;
-};
-
-export type TaskConfig = PollerConfig & {
   initialValue?: any;
 };
+
+export type PollerConfig = Omit<TaskOption, 'initialValue'>;
