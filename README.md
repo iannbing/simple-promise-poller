@@ -15,14 +15,11 @@ yarn add simple-promise-poller
 Wrap your logic inside of a task function that accepts `cancelTask` as its first parameters.
 Then plug your task function to `poll` function to start polling.
 
-You can configure these options per task (see configuration).
+By default, the polling interval is 1000 ms, and retry limit is 10, and first run will be triggered after the first interval.
+You can change these configurations whenever you need (see #configuration).
 
 ```Javascript
 import { poll, pipe, clearAllTasks, setConfig } from 'simple-promise-poller';
-
-// By default, polling interval is 2000 ms, and retryLimit is 10.
-// You can optionally overwrite these options with `setConfig`.
-setConfig({ interval: 1000, retryLimit: 3 });
 
 // Wrap your logic inside of an async function.
 async function checkKitchenStatus(cancelTask) {
@@ -32,7 +29,7 @@ async function checkKitchenStatus(cancelTask) {
   if(status === "ready-to-serve") cancelTask();
 }
 
-// Start polling.
+// Start polling. 
 poll(checkKitchenStatus);
 
 // You could start other tasks in parallel.
@@ -68,7 +65,7 @@ const pollerB = createPoller();
 pollerA.poll(taskA1);
 pollerB.poll(taskB1);
 
-// taskB1 is still running.
+// taskA1 will be canceled, but taskB1 is still running.
 pollerA.clear();
 
 ```
@@ -170,8 +167,8 @@ async function task1(cancelTask, getRetryCount, previousValue) {
 }
 async function task2(cancelTask, getRetryCount, previousValue) {
   console.log(previousValue); // "bird"
-  // Cancel the task with a rejection with an error "flower"
-  cancelTask(false, "flower"); 
+  // Cancel the task with a rejection with an error "error!"
+  cancelTask(false, "error!"); 
 }
 async function task3(cancelTask, getRetryCount, previousValue) {
   console.log(previousValue); // Will not print;
@@ -182,9 +179,53 @@ try {
   const result = await poller.pipe(task1, task2, task3)()
   console.log(result); // Will not print;
 }catch(error){
-  console.log(error); // "flower"
+  console.log(error); // "error!"
 }
 
 ```
 
 ## Configuration
+
+You could overwrite the config of the poller instance using `setConfig`.
+Note that the changes of the config won't apply to your running tasks.
+
+```javascript
+import { poll, setConfig, createPoller } from 'simple-promise-poller';
+
+// Default: interval 1000; retryLimit: 10. First execution is in 1000ms.
+poll(task1); 
+
+// interval 2000; retryLimit: 3
+// The first execution will be triggered immediately because runOnStart was set as true.
+setConfig({ interval: 2000, retryLimit: 3, runOnStart: true });
+poll(task2); 
+
+```
+
+You could specify the config when creating a new poller:
+
+```javascript
+const poller = createPoller({interval: 7000}); // Initial config.
+poller.poll(task3); // interval: 7000
+poller.setConfig({interval: 3000});
+poller.poll(task4); // interval: 3000
+```
+
+Yet, you could specify the options per task if really needed.
+
+```javascript
+
+poll(task1, {interval: 2000}); 
+
+pipe(
+  task2, 
+  task3, 
+  task4
+)({interval: 4000})
+
+poll(task5); // Still default interval 1000.
+
+```
+
+## API
+
