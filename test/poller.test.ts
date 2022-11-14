@@ -1,4 +1,11 @@
-import { CancelTask, createPoller } from '../src';
+import {
+  CancelTask,
+  clearAllTasks,
+  isPollerIdling,
+  setConfig,
+  poll,
+  pipe,
+} from '../src';
 
 const errorMessage = (count: number) =>
   `stop polling after retry ${count} times.`;
@@ -7,10 +14,10 @@ const getRandomNumber = (min = 5, max = 9) =>
   Math.floor(min + Math.random() * (max - min + 1));
 
 describe('Poller', () => {
-  const poller = createPoller({ interval: 1 });
+  setConfig({ interval: 1 });
   beforeEach(async () => {
-    poller.clear();
-    expect(poller.isIdling()).toBe(true);
+    clearAllTasks();
+    expect(isPollerIdling()).toBe(true);
   });
 
   it('should retry 10 times by default', async () => {
@@ -19,11 +26,11 @@ describe('Poller', () => {
     });
 
     try {
-      await poller.poll(mockCallback);
+      await poll(mockCallback);
     } catch (error) {
       expect(String(error)).toEqual(`Error: ${errorMessage(10)}`);
     }
-    expect(poller.isIdling()).toBe(true);
+    expect(isPollerIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(10);
   });
 
@@ -39,11 +46,11 @@ describe('Poller', () => {
     });
 
     try {
-      await poller.poll(mockCallback);
+      await poll(mockCallback);
     } catch (error) {
       expect(String(error)).toEqual(`Error: ${errorMessage(10)}`);
     }
-    expect(poller.isIdling()).toBe(true);
+    expect(isPollerIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(10 + resetAtCount + 1);
   });
 
@@ -57,11 +64,11 @@ describe('Poller', () => {
     });
 
     setTimeout(() => {
-      expect(poller.isIdling()).toBe(false);
+      expect(isPollerIdling()).toBe(false);
     }, 1);
 
-    await poller.poll(mockCallback);
-    expect(poller.isIdling()).toBe(true);
+    await poll(mockCallback);
+    expect(isPollerIdling()).toBe(true);
 
     expect(mockCallback).toHaveBeenCalledTimes(times);
   });
@@ -78,11 +85,11 @@ describe('Poller', () => {
     );
 
     setTimeout(() => {
-      expect(poller.isIdling()).toBe(false);
+      expect(isPollerIdling()).toBe(false);
     }, 1);
 
     try {
-      await poller.poll(mockCallback);
+      await poll(mockCallback);
     } catch (error) {
       expect(error).toEqual('task failed');
     }
@@ -99,13 +106,13 @@ describe('Poller', () => {
     });
 
     setTimeout(() => {
-      expect(poller.isIdling()).toBe(false);
-      poller.clear();
-      expect(poller.isIdling()).toBe(true);
+      expect(isPollerIdling()).toBe(false);
+      clearAllTasks();
+      expect(isPollerIdling()).toBe(true);
     }, 100);
 
     await Promise.allSettled(
-      [...Array(taskCount)].map(() => poller.poll(mockCallback))
+      [...Array(taskCount)].map(() => poll(mockCallback))
     );
   });
 
@@ -119,11 +126,11 @@ describe('Poller', () => {
     });
 
     setTimeout(() => {
-      expect(poller.isIdling()).toBe(false);
+      expect(isPollerIdling()).toBe(false);
     }, 1);
 
-    const value = await poller.poll(mockCallback);
-    expect(poller.isIdling()).toBe(true);
+    const value = await poll(mockCallback);
+    expect(isPollerIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(times);
     expect(value).toEqual(times - 1);
   });
@@ -138,11 +145,11 @@ describe('Poller', () => {
     });
 
     setTimeout(() => {
-      expect(poller.isIdling()).toBe(false);
+      expect(isPollerIdling()).toBe(false);
     }, 1);
 
-    const value = await poller.poll(mockCallback);
-    expect(poller.isIdling()).toBe(true);
+    const value = await poll(mockCallback);
+    expect(isPollerIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(times);
     expect(value).toEqual(100);
   });
@@ -157,21 +164,21 @@ describe('Poller', () => {
     });
 
     setTimeout(() => {
-      expect(poller.isIdling()).toBe(false);
+      expect(isPollerIdling()).toBe(false);
     }, 1);
 
     let value: any;
     try {
-      value = await poller.poll(mockCallback);
+      value = await poll(mockCallback);
     } catch (error) {
       expect(mockCallback).toHaveBeenCalledTimes(times);
       expect(error).toEqual(times - 1);
     }
-    expect(poller.isIdling()).toBe(true);
+    expect(isPollerIdling()).toBe(true);
     expect(value).toBeUndefined();
   });
 
-  it('.pipe should execute the tasks sequentially.', async () => {
+  it('pipe should execute the tasks sequentially.', async () => {
     const times1 = getRandomNumber();
 
     let counter1 = 0;
@@ -203,16 +210,13 @@ describe('Poller', () => {
     );
 
     setTimeout(() => {
-      expect(poller.isIdling()).toBe(false);
+      expect(isPollerIdling()).toBe(false);
     }, 1);
 
     const initialValue = getRandomNumber();
-    const value = await poller.pipe(
-      mockCallback1,
-      mockCallback2
-    )({ initialValue });
+    const value = await pipe(mockCallback1, mockCallback2)({ initialValue });
 
-    expect(poller.isIdling()).toBe(true);
+    expect(isPollerIdling()).toBe(true);
 
     expect(mockCallback1).toHaveBeenCalledTimes(times1);
     expect(mockCallback2).toHaveBeenCalledTimes(times2);
@@ -230,11 +234,7 @@ describe('Poller', () => {
     });
 
     try {
-      const result = await poller.pipe(
-        mockCallback1,
-        mockCallback2,
-        mockCallback3
-      )();
+      const result = await pipe(mockCallback1, mockCallback2, mockCallback3)();
       console.log(result); // Will not print;
     } catch (error) {
       expect(error).toEqual('flower');
@@ -243,6 +243,6 @@ describe('Poller', () => {
     expect(mockCallback2).toHaveBeenCalledTimes(1);
     expect(mockCallback3).toHaveBeenCalledTimes(0);
 
-    expect(poller.isIdling()).toBe(true);
+    expect(isPollerIdling()).toBe(true);
   });
 });
