@@ -218,4 +218,31 @@ describe('Poller', () => {
     expect(mockCallback2).toHaveBeenCalledTimes(times2);
     expect(value).toEqual(initialValue + result1 + result2);
   });
+  it('pipe should bubble up the error', async () => {
+    const mockCallback1 = jest.fn(async (cancelTask: CancelTask<string>) => {
+      cancelTask(true, 'bird');
+    });
+    const mockCallback2 = jest.fn(async (cancelTask: CancelTask<string>) => {
+      cancelTask(false, 'flower');
+    });
+    const mockCallback3 = jest.fn(async (cancelTask: CancelTask<string>) => {
+      cancelTask(true, 'water');
+    });
+
+    try {
+      const result = await poller.pipe(
+        mockCallback1,
+        mockCallback2,
+        mockCallback3
+      )();
+      console.log(result); // Will not print;
+    } catch (error) {
+      expect(error).toEqual('flower');
+    }
+    expect(mockCallback1).toHaveBeenCalledTimes(1);
+    expect(mockCallback2).toHaveBeenCalledTimes(1);
+    expect(mockCallback3).toHaveBeenCalledTimes(0);
+
+    expect(poller.isIdling()).toBe(true);
+  });
 });
