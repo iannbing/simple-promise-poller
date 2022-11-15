@@ -25,7 +25,7 @@ import { poll, pipe, clearAllTasks, setConfig } from 'simple-promise-poller';
 async function checkKitchenStatus(cancelTask) {
   // Your logic, e.g. send a GET request to a kitchen API
   const status = await fetch(...); // "prepare-ingredient" | "cooking" | "ready-to-serve".
-  // Stop polling however you like.
+  // Stop polling when the condition meets.
   if(status === "ready-to-serve") cancelTask();
 }
 
@@ -50,7 +50,7 @@ clearAllTasks();
 
 ```
 
-### createPoller
+### Create poller
 
 Note that all the above functions are part of a Poller singleton and `clearAllTasks` will cancel
 **all** tasks started by `poll` function. You might want to create multiple Poller instances to
@@ -70,10 +70,10 @@ pollerA.clear();
 
 ```
 
-### Retry count
+### Get retry count
 
 Sometimes you might have some follow-up actions when a task results in a rejection, but you still
-want to keep the task running. You might find `getRetryCount` quite handy.
+want to keep the task running. Call `getRetryCount` to get the retry count.
 
 ```Javascript
 // Given: default retryLimit is 10.
@@ -86,7 +86,7 @@ async function task(cancelTask, getRetryCount) {
 poll(task);
 ```
 
-### Resolve/reject the master promise
+### Resolve or reject the master promise
 
 By default, `cancelTask` resolves the master promise, and the resolved value is the last return value of your task function.
 
@@ -226,6 +226,3 @@ pipe(
 poll(task5); // Still default interval 1000.
 
 ```
-
-## API
-
