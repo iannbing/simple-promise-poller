@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.0-rc.1",
   "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -32,7 +32,17 @@
     "trailingComma": "es5"
   },
   "name": "simple-promise-poller",
-  "author": "Huang-Ming Chang",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iannbing/simple-promise-poller.git"
+  },
+  "author": "Huang-Ming Chang <huang.m.chang@gmail.com>",
+  "bugs": {
+    "url": "https://github.com/iannbing/simple-promise-poller/issues"
+  },
+  "homepage": "https://github.com/iannbing/simple-promise-poller#readme",
+  "description": "A simple React tree menu component",
+  "keywords": ["promise", "promises", "poller", "polling", "poll", "fetch"],
   "module": "dist/simple-promise-poller.esm.js",
   "size-limit": [
     {
