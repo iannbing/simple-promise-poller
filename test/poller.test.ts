@@ -14,7 +14,7 @@ const getRandomNumber = (min = 5, max = 9) =>
   Math.floor(min + Math.random() * (max - min + 1));
 
 describe('Poller', () => {
-  setConfig({ interval: 1 });
+  setConfig({ interval: 10 });
   beforeEach(async () => {
     clearAllTasks();
     expect(isPollerIdling()).toBe(true);
@@ -52,6 +52,48 @@ describe('Poller', () => {
     }
     expect(isPollerIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(10 + resetAtCount + 1);
+  });
+
+  it('should time out if the promise is still hanging right before the next polling', async () => {
+    const mockCallback = jest.fn(async () => {
+      await new Promise(resolve => setTimeout(resolve, 10000000));
+    });
+
+    try {
+      await poll(mockCallback);
+    } catch (error) {
+      expect(String(error)).toEqual(`Timed out after ${10} ms`);
+    }
+    expect(isPollerIdling()).toBe(true);
+    expect(mockCallback).toHaveBeenCalledTimes(10);
+  });
+
+  it('should time out early if timeout is given', async () => {
+    const mockCallback = jest.fn(async () => {
+      await new Promise(resolve => setTimeout(resolve, 10000000));
+    });
+
+    try {
+      await poll(mockCallback, { timeout: 3 });
+    } catch (error) {
+      expect(String(error)).toEqual(`Timed out after ${3} ms`);
+    }
+    expect(isPollerIdling()).toBe(true);
+    expect(mockCallback).toHaveBeenCalledTimes(10);
+  });
+
+  it('should ignore given timeout if timeout is greater than interval', async () => {
+    const mockCallback = jest.fn(async () => {
+      await new Promise(resolve => setTimeout(resolve, 10000000));
+    });
+
+    try {
+      await poll(mockCallback, { timeout: 20 });
+    } catch (error) {
+      expect(String(error)).toEqual(`Timed out after ${10} ms`);
+    }
+    expect(isPollerIdling()).toBe(true);
+    expect(mockCallback).toHaveBeenCalledTimes(10);
   });
 
   it('should stop polling and resolve the master promise when cancelTask is called without any input.', async () => {
@@ -245,4 +287,5 @@ describe('Poller', () => {
 
     expect(isPollerIdling()).toBe(true);
   });
+  // TODO: timeout
 });

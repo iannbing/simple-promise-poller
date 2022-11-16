@@ -1,6 +1,6 @@
 export type CancelablePromise<T = unknown> = {
   readonly promise: Promise<T>;
-  readonly cancel: () => void;
+  readonly cancel: (reason?: any) => void;
 };
 
 /**
@@ -22,9 +22,9 @@ export function makeCancelable<T>(original: Promise<T>): CancelablePromise<T> {
 
   return {
     promise,
-    cancel: () => {
+    cancel: (reason: any) => {
       isCanceled = true;
-      if (rejectRef) rejectRef('canceled');
+      if (rejectRef) rejectRef(reason ?? 'canceled');
     },
   };
 }

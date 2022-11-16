@@ -47,13 +47,26 @@ export const createPoller = (config: PollerConfig = {}) => {
             reject(value || cachedValue || 'canceled');
           }
         };
+
+        const interval = getValidInterval(
+          option?.interval ?? pollerConfig.interval
+        );
+
+        // Timeout cannot be greater than interval.
+        const timeout = Math.min(
+          option?.timeout ?? pollerConfig.timeout ?? interval,
+          interval
+        );
+
         const runTask = async () => {
+          const { cancel, promise } = makeCancelable(
+            task(cancelTask, retryCounter.getValue, option?.initialValue)
+          );
+
+          setTimeout(() => cancel(`Timed out after ${timeout} ms`), timeout);
+
           try {
-            cachedValue = await task(
-              cancelTask,
-              retryCounter.getValue,
-              option?.initialValue
-            );
+            cachedValue = await promise;
             retryCounter.reset();
           } catch (error) {
             // Never abort the task if retryLimit is set as `null` on purpose.
@@ -73,9 +86,7 @@ export const createPoller = (config: PollerConfig = {}) => {
           }
         };
         if (option?.runOnStart || pollerConfig.runOnStart) runTask();
-        const interval = getValidInterval(
-          option?.interval ?? pollerConfig.interval
-        );
+
         const eventId = setInterval(runTask, interval);
         taskEventMapping.set(taskId, eventId);
       })
@@ -116,8 +127,10 @@ export const createPoller = (config: PollerConfig = {}) => {
 
   const isIdling = () => taskEventMapping.size === 0;
 
-  const setConfig = (newConfig: PollerConfig) => {
-    pollerConfig = { ...pollerConfig, ...newConfig };
+  const setConfig = (newConfig?: PollerConfig, reset?: boolean) => {
+    pollerConfig = hasValue(newConfig)
+      ? { ...(reset ? DEFAULT_CONFIG : pollerConfig), ...newConfig }
+      : DEFAULT_CONFIG;
   };
 
   return { poll, pipe, isIdling, clear, setConfig };

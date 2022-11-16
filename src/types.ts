@@ -11,6 +11,7 @@ export type AsyncTask<T = unknown> = (
 
 export type TaskOption = {
   interval?: number;
+  timeout?: number;
   retryLimit?: number | null;
   runOnStart?: boolean;
   initialValue?: any;

@@ -15,8 +15,8 @@ yarn add simple-promise-poller
 Wrap your logic inside of a task function that accepts `cancelTask` as its first parameters.
 Then plug your task function to `poll` function to start polling.
 
-By default, the polling interval is 1000 ms, and retry limit is 10, and first run will be triggered after the first interval.
-You can change these configurations whenever you need (see #configuration).
+By default, the polling interval is 1000 ms, and retry limit is 10, and the first task run will be triggered after the first interval.
+You can change these configurations whenever you need (see [Configuration](#configuration)).
 
 ```Javascript
 import { poll, pipe, clearAllTasks, setConfig } from 'simple-promise-poller';
@@ -184,25 +184,67 @@ try {
 
 ```
 
+### Time out the hanging promise
+
+If a task run results in a hanging promise, it will be timed out when the next polling starts.
+You could time out your task earlier than the next polling by tweaking the config (see [Configuration](#configuration)).
+Note that the custom value of `timeout` will be ignore if it is greater than `interval`.
+
+```Javascript
+// Given the default interval 1000ms.
+const hangingTask = async () => {
+  await new Promise(resolve => setTimeout(resolve, 10000000));
+};
+
+try {
+  await poll(hangingTask);
+  console.log("resolved"); // Will not print.
+} catch (error) {
+  console.error(error); // "Timed out after 1000ms"
+}
+
+```
+
 ## Configuration
 
 You could overwrite the config of the poller instance using `setConfig`.
 Note that the changes of the config won't apply to your running tasks.
 
+If you wish to reset it to default with only the changes you gave, pass `true` as the second parameter.
+
+`timeout` goes together with `interval` if not set.
+You could make `timeout` less than `interval`, but not greater.
+
 ```javascript
 import { poll, setConfig, createPoller } from 'simple-promise-poller';
 
-// Default: interval 1000; retryLimit: 10. First execution is in 1000ms.
+// Default: interval 1000; (timeout: 1000;) retryLimit: 10. 
+// First execution is in 1000ms.
 poll(task1); 
 
-// interval 2000; retryLimit: 3
-// The first execution will be triggered immediately because runOnStart was set as true.
-setConfig({ interval: 2000, retryLimit: 3, runOnStart: true });
+// interval 2000; timeout: 2000;
+setConfig({ interval: 2000 });
 poll(task2); 
+
+// interval 2000; timeout: 500; retryLimit: 3
+// The first execution will be triggered immediately because runOnStart was set as true.
+setConfig({ interval: 2000, timeout: 500, retryLimit: 3, runOnStart: true });
+poll(task3); 
+
+// interval 3000; timeout: 3000; retryLimit: 3
+// The first execution will be triggered immediately because runOnStart was set as true.
+setConfig({ interval: 3000, timeout: 50000 });
+poll(task4); 
+
+// Extend the default config.
+// interval 2000; timeout: 1000; retryLimit: 10, 
+// First execution is in 1000ms.
+setConfig({ interval: 2000, timeout: 1000 }, true);
+poll(task5); 
 
 ```
 
-You could specify the config when creating a new poller:
+You could specify its config when creating a new poller:
 
 ```javascript
 const poller = createPoller({interval: 7000}); // Initial config.
@@ -225,4 +267,16 @@ pipe(
 
 poll(task5); // Still default interval 1000.
 
+```
+
+To set the configurations back to default, simply call `setConfig` without any input.
+
+```Javascript
+import { poll, setConfig, createPoller } from 'simple-promise-poller';
+
+setConfig({interval: 3000});
+poll(task1); // Poll per 3000 ms.
+
+setConfig(); 
+poll(task2); // Poll per 1000 ms.
 ```
