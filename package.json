@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1-rc.2",
+  "version": "0.1.1",
   "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -42,7 +42,14 @@
   },
   "homepage": "https://github.com/iannbing/simple-promise-poller#readme",
   "description": "A simple React tree menu component",
-  "keywords": ["promise", "promises", "poller", "polling", "poll", "fetch"],
+  "keywords": [
+    "promise",
+    "promises",
+    "poller",
+    "polling",
+    "poll",
+    "fetch"
+  ],
   "module": "dist/simple-promise-poller.esm.js",
   "size-limit": [
     {
