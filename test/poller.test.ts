@@ -100,7 +100,7 @@ describe('Poller', () => {
     const times = getRandomNumber();
 
     let counter = 0;
-    const mockCallback = jest.fn(async (cancelTask: CancelTask) => {
+    const mockCallback = jest.fn(async (cancelTask: CancelTask<void>) => {
       counter += 1;
       if (counter >= times) cancelTask();
     });
@@ -266,13 +266,13 @@ describe('Poller', () => {
   });
   it('pipe should bubble up the error', async () => {
     const mockCallback1 = jest.fn(async (cancelTask: CancelTask<string>) => {
-      cancelTask(true, 'bird');
+      return cancelTask(true, 'bird');
     });
     const mockCallback2 = jest.fn(async (cancelTask: CancelTask<string>) => {
-      cancelTask(false, 'flower');
+      return cancelTask(false, 'flower');
     });
     const mockCallback3 = jest.fn(async (cancelTask: CancelTask<string>) => {
-      cancelTask(true, 'water');
+      return cancelTask(true, 'water');
     });
 
     try {
@@ -287,5 +287,4 @@ describe('Poller', () => {
 
     expect(isPollerIdling()).toBe(true);
   });
-  // TODO: timeout
 });

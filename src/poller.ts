@@ -20,7 +20,10 @@ export const createPoller = (config: PollerConfig = {}) => {
   const tasks = new Map<number, CancelablePromise<unknown>>();
   const taskEventMapping = new Map<number, number | NodeJS.Timer>();
 
-  const poll = <T>(task: AsyncTask<T>, option?: TaskOption) => {
+  const poll = <T = unknown, E = Error>(
+    task: AsyncTask<T, E>,
+    option?: TaskOption
+  ) => {
     const clearEvents = (taskId: number) => {
       if (taskEventMapping.has(taskId)) {
         const eventId = taskEventMapping.get(taskId);
@@ -31,20 +34,21 @@ export const createPoller = (config: PollerConfig = {}) => {
 
     taskCount += 1;
     const taskId = taskCount;
-    let cachedValue: T | undefined | void;
+    let cachedValue: T | undefined;
 
     const retryCounter = RetryCounter();
     const masterPromise = makeCancelable(
-      new Promise<T | undefined | void>(async (resolve, reject) => {
-        const cancelTask: CancelTask<T> = (isResolved, value) => {
+      new Promise<T | undefined>(async (resolve, reject) => {
+        const cancelTask: CancelTask<T, E> = (isResolved, value) => {
           clearEvents(taskId);
           tasks.delete(taskId);
 
           if (isResolved === undefined || isResolved) {
-            resolve(value || cachedValue);
-            return value || cachedValue;
+            resolve((value as T) ?? cachedValue);
+            return (value as T) ?? cachedValue;
           } else {
-            reject(value || cachedValue || 'canceled');
+            reject(value || cachedValue || new Error('canceled'));
+            return;
           }
         };
 
@@ -59,7 +63,7 @@ export const createPoller = (config: PollerConfig = {}) => {
         );
 
         const runTask = async () => {
-          const { cancel, promise } = makeCancelable(
+          const { cancel, promise } = makeCancelable<T | undefined>(
             task(cancelTask, retryCounter.getValue, option?.initialValue)
           );
 
@@ -96,14 +100,14 @@ export const createPoller = (config: PollerConfig = {}) => {
     return masterPromise.promise;
   };
 
-  const pipe = <T, R extends T>(...tasks: AsyncTask<T>[]) => async (
+  const pipe = <T = unknown, E = Error>(...tasks: AsyncTask<T, E>[]) => async (
     config?: TaskOption
   ) => {
     const { initialValue, ...pipeConfig } = config || {};
-    const result = await tasks.reduce(async (prevTask, task) => {
+    return tasks.reduce(async (prevTask, task) => {
       try {
         const previousResult = await prevTask;
-        return poll<T>(
+        return poll<T, E>(
           (cancelTask, getRetryCount) =>
             task(cancelTask, getRetryCount, previousResult),
           pipeConfig
@@ -111,8 +115,7 @@ export const createPoller = (config: PollerConfig = {}) => {
       } catch (error) {
         throw error;
       }
-    }, Promise.resolve(initialValue) as Promise<T | undefined | void>);
-    return result as R;
+    }, Promise.resolve(initialValue) as Promise<T | undefined>);
   };
 
   const clear = () => {
