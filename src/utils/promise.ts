@@ -30,9 +30,11 @@ export function makeCancelable<T>(original: Promise<T>): CancelablePromise<T> {
 
   return {
     promise,
-    cancel: (reason: any) => {
+    cancel: (reason?: any) => {
       // Only call reject if the promise is not yet resolved / rejected.
-      if (rejectRef && status === 'READY') rejectRef(reason ?? 'canceled');
+      if (rejectRef && status === 'READY') {
+        rejectRef(reason !== undefined ? reason : 'canceled');
+      }
       status = 'REJECTED';
     },
   };
