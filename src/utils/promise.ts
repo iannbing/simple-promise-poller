@@ -10,21 +10,30 @@ export type CancelablePromise<T = unknown> = {
  * @param original The original promise to make cancelable.
  */
 export function makeCancelable<T>(original: Promise<T>): CancelablePromise<T> {
-  let isCanceled = false;
+  let status: 'RESOLVED' | 'REJECTED' | 'READY' = 'READY';
   let rejectRef: (reason?: any) => void;
 
   const promise = new Promise<T>((resolve, reject) => {
     rejectRef = reject;
     original
-      .then(result => (isCanceled ? reject('canceled') : resolve(result)))
-      .catch(error => (isCanceled ? reject('canceled') : reject(error)));
+      .then(result => {
+        if (status === 'REJECTED') reject('canceled');
+        status = 'RESOLVED';
+        resolve(result);
+      })
+      .catch(error => {
+        if (status === 'REJECTED') reject('canceled');
+        status = 'REJECTED';
+        reject(error);
+      });
   });
 
   return {
     promise,
     cancel: (reason: any) => {
-      isCanceled = true;
-      if (rejectRef) rejectRef(reason ?? 'canceled');
+      // Only call reject if the promise is not yet resolved / rejected.
+      if (rejectRef && status === 'READY') rejectRef(reason ?? 'canceled');
+      status = 'REJECTED';
     },
   };
 }
