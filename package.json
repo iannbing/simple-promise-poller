@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.1.2",
   "license": "MIT",
   "main": "dist/index.js",
   "typings": "dist/index.d.ts",
@@ -41,7 +41,7 @@
     "url": "https://github.com/iannbing/simple-promise-poller/issues"
   },
   "homepage": "https://github.com/iannbing/simple-promise-poller#readme",
-  "description": "A simple React tree menu component",
+  "description": "A simple poller that allows you to perform sequential async operations with ease.",
   "keywords": [
     "promise",
     "promises",
