@@ -20,7 +20,7 @@ export const createPoller = (config: PollerConfig = {}) => {
   const tasks = new Map<number, CancelablePromise<unknown>>();
   const taskEventMapping = new Map<number, number | NodeJS.Timer>();
 
-  const poll = <T = unknown, E = Error>(
+  const poll = async <T = unknown, E = Error>(
     task: AsyncTask<T, E>,
     option?: TaskOption
   ) => {
@@ -102,7 +102,8 @@ export const createPoller = (config: PollerConfig = {}) => {
     );
 
     tasks.set(taskId, masterPromise);
-    return masterPromise.promise;
+    const outcome = await masterPromise.promise;
+    return outcome === 'canceled' ? undefined : outcome;
   };
 
   const pipe = <T = unknown, E = Error>(...tasks: AsyncTask<T, E>[]) => async (
@@ -117,7 +118,6 @@ export const createPoller = (config: PollerConfig = {}) => {
             task(cancelTask, getRetryCount, previousResult),
           pipeConfig
         );
-        if (resolvedValue === 'canceled') throw new Error('canceled');
         return resolvedValue;
       } catch (error) {
         throw error;
