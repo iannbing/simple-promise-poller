@@ -34,11 +34,11 @@ export const createPoller = (config: PollerConfig = {}) => {
 
     taskCount += 1;
     const taskId = taskCount;
-    let cachedValue: T | undefined;
+    let cachedValue: T | undefined | void;
 
     const retryCounter = RetryCounter();
     const masterPromise = makeCancelable(
-      new Promise<T | undefined>(async (resolve, reject) => {
+      new Promise<T | void | undefined>(async (resolve, reject) => {
         const cancelTask: CancelTask<T, E> = (isResolved, value) => {
           clearEvents(taskId);
           tasks.delete(taskId);
@@ -47,7 +47,7 @@ export const createPoller = (config: PollerConfig = {}) => {
             resolve((value as T) ?? cachedValue);
             return (value as T) ?? cachedValue;
           } else {
-            reject(value || cachedValue || new Error('canceled'));
+            reject(value || cachedValue);
             return;
           }
         };
@@ -67,10 +67,15 @@ export const createPoller = (config: PollerConfig = {}) => {
             task(cancelTask, retryCounter.getValue, option?.initialValue)
           );
 
-          setTimeout(() => cancel(`Timed out after ${timeout} ms`), timeout);
+          setTimeout(
+            () => cancel(true, `Timed out after ${timeout} ms`),
+            timeout
+          );
 
           try {
-            cachedValue = await promise;
+            const resolvedValue = await promise;
+            if (resolvedValue === 'canceled') throw new Error('canceled');
+            cachedValue = resolvedValue;
             retryCounter.reset();
           } catch (error) {
             // Never abort the task if retryLimit is set as `null` on purpose.
@@ -107,15 +112,17 @@ export const createPoller = (config: PollerConfig = {}) => {
     return tasks.reduce(async (prevTask, task) => {
       try {
         const previousResult = await prevTask;
-        return poll<T, E>(
+        const resolvedValue = await poll<T, E>(
           (cancelTask, getRetryCount) =>
             task(cancelTask, getRetryCount, previousResult),
           pipeConfig
         );
+        if (resolvedValue === 'canceled') throw new Error('canceled');
+        return resolvedValue;
       } catch (error) {
         throw error;
       }
-    }, Promise.resolve(initialValue) as Promise<T | undefined>);
+    }, Promise.resolve(initialValue) as Promise<T | void>);
   };
 
   const clear = () => {

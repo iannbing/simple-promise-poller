@@ -1,6 +1,6 @@
 export type CancelablePromise<T = unknown> = {
-  readonly promise: Promise<T>;
-  readonly cancel: (reason?: any) => void;
+  readonly promise: Promise<T | 'canceled' | void>;
+  readonly cancel: (shouldReject?: boolean, reason?: any) => void;
 };
 
 /**
@@ -9,20 +9,24 @@ export type CancelablePromise<T = unknown> = {
  * regardless of whether it resolved or rejected.
  * @param original The original promise to make cancelable.
  */
-export function makeCancelable<T>(original: Promise<T>): CancelablePromise<T> {
+export function makeCancelable<T>(
+  original: Promise<T | void>
+): CancelablePromise<T> {
   let status: 'RESOLVED' | 'REJECTED' | 'READY' = 'READY';
+  let resolveRef: (value: T | 'canceled' | void | PromiseLike<T>) => void;
   let rejectRef: (reason?: any) => void;
 
-  const promise = new Promise<T>((resolve, reject) => {
+  const promise = new Promise<T | 'canceled' | void>((resolve, reject) => {
+    resolveRef = resolve;
     rejectRef = reject;
     original
       .then(result => {
-        if (status === 'REJECTED') reject('canceled');
+        if (status === 'REJECTED') reject();
         status = 'RESOLVED';
         resolve(result);
       })
       .catch(error => {
-        if (status === 'REJECTED') reject('canceled');
+        if (status === 'REJECTED') reject();
         status = 'REJECTED';
         reject(error);
       });
@@ -30,10 +34,13 @@ export function makeCancelable<T>(original: Promise<T>): CancelablePromise<T> {
 
   return {
     promise,
-    cancel: (reason?: any) => {
+    cancel: (shouldReject = false, reason?: any) => {
       // Only call reject if the promise is not yet resolved / rejected.
-      if (rejectRef && status === 'READY') {
-        rejectRef(reason !== undefined ? reason : 'canceled');
+      if (!shouldReject && resolveRef && status === 'READY') {
+        resolveRef('canceled');
+      }
+      if (shouldReject && rejectRef && status === 'READY') {
+        rejectRef(reason);
       }
       status = 'REJECTED';
     },

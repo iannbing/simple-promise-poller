@@ -1,13 +1,13 @@
 export type CancelTask<T = unknown, E = Error> = (
   isResolved?: boolean,
   value?: T | E
-) => T | undefined;
+) => T | void | undefined;
 
 export type AsyncTask<T = unknown, E = Error> = (
   cancelTask: CancelTask<T, E>,
   getRetryCount: () => number,
   initialValue?: any
-) => Promise<T | undefined>;
+) => Promise<T | void | undefined>;
 
 export type TaskOption = {
   interval?: number;
