@@ -30,6 +30,11 @@ export const createPoller = (config: PollerConfig = {}) => {
         const eventId = taskEventMapping.get(taskId);
         clearInterval(eventId);
         taskEventMapping.delete(taskId);
+        tasks.delete(taskId);
+
+        const cachedValue = taskOutcomes.get(taskId);
+        taskOutcomes.delete(taskId);
+        return cachedValue;
       }
     };
 
@@ -40,16 +45,12 @@ export const createPoller = (config: PollerConfig = {}) => {
     const masterPromise = makeCancelable(
       new Promise<T | void | undefined>(async (resolve, reject) => {
         const cancelTask: CancelTask<T, E> = (isResolved, value) => {
-          clearEvents(taskId);
-          tasks.delete(taskId);
-
-          const cachedValue = taskOutcomes.get(taskId);
+          const cachedValue = clearEvents(taskId);
           if (isResolved === undefined || isResolved) {
             resolve((value as T) ?? cachedValue);
             return (value as T) ?? cachedValue;
           } else {
             reject(value || cachedValue);
-            return;
           }
         };
 
@@ -86,9 +87,8 @@ export const createPoller = (config: PollerConfig = {}) => {
             );
             if (retryLimit === null) return;
             if (retryCounter.getValue() + 1 >= retryLimit) {
-              clearEvents(taskId);
-              tasks.delete(taskId);
-              reject(error);
+              const cachedValue = clearEvents(taskId);
+              reject(error || cachedValue);
               return;
             }
             retryCounter.increment();
@@ -131,6 +131,7 @@ export const createPoller = (config: PollerConfig = {}) => {
       window.clearInterval(eventId);
     });
     taskEventMapping.clear();
+    taskOutcomes.clear();
     tasks.clear();
     taskCount = 0;
   };
