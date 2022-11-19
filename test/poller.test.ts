@@ -164,7 +164,8 @@ describe('Poller', () => {
     let counter = 0;
     const mockCallback = jest.fn(async (cancelTask: CancelTask<number>) => {
       counter += 1;
-      return counter >= times ? cancelTask() : counter;
+      if (counter >= times) cancelTask();
+      return counter;
     });
 
     setTimeout(() => {
@@ -286,5 +287,33 @@ describe('Poller', () => {
     expect(mockCallback3).toHaveBeenCalledTimes(0);
 
     expect(isPollerIdling()).toBe(true);
+  });
+  it('clearAllTasks should not result in task rejections, but resolve all tasks with `undefined`', async () => {
+    const mockCallback1 = jest.fn(async () => {
+      return {};
+    });
+    const mockCallback2 = jest.fn(async () => {
+      return 123;
+    });
+    const mockCallback3 = jest.fn(async () => {
+      return 'value';
+    });
+
+    await Promise.all([
+      poll(mockCallback1).then(result => expect(result).toEqual({})),
+      poll(mockCallback2).then(result => expect(result).toEqual(123)),
+      poll(mockCallback3).then(result => expect(result).toEqual('value')),
+      new Promise<void>(resolve =>
+        setTimeout(() => {
+          expect(isPollerIdling()).toBe(false);
+          clearAllTasks();
+          expect(mockCallback1).toHaveBeenCalled();
+          expect(mockCallback2).toHaveBeenCalled();
+          expect(mockCallback3).toHaveBeenCalled();
+          expect(isPollerIdling()).toBe(true);
+          resolve();
+        }, 100)
+      ),
+    ]);
   });
 });
