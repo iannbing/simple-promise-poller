@@ -18,6 +18,7 @@ export const createPoller = (config: PollerConfig = {}) => {
   let pollerConfig = { ...DEFAULT_CONFIG, ...config };
   let taskCount = 0;
   const tasks = new Map<number, CancelablePromise<unknown>>();
+  const taskOutcomes = new Map<number, any>();
   const taskEventMapping = new Map<number, number | NodeJS.Timer>();
 
   const poll = async <T = unknown, E = Error>(
@@ -34,7 +35,6 @@ export const createPoller = (config: PollerConfig = {}) => {
 
     taskCount += 1;
     const taskId = taskCount;
-    let cachedValue: T | undefined | void;
 
     const retryCounter = RetryCounter();
     const masterPromise = makeCancelable(
@@ -43,6 +43,7 @@ export const createPoller = (config: PollerConfig = {}) => {
           clearEvents(taskId);
           tasks.delete(taskId);
 
+          const cachedValue = taskOutcomes.get(taskId);
           if (isResolved === undefined || isResolved) {
             resolve((value as T) ?? cachedValue);
             return (value as T) ?? cachedValue;
@@ -74,8 +75,7 @@ export const createPoller = (config: PollerConfig = {}) => {
 
           try {
             const resolvedValue = await promise;
-            if (resolvedValue === 'canceled') throw new Error('canceled');
-            cachedValue = resolvedValue;
+            taskOutcomes.set(taskId, resolvedValue);
             retryCounter.reset();
           } catch (error) {
             // Never abort the task if retryLimit is set as `null` on purpose.
@@ -102,8 +102,7 @@ export const createPoller = (config: PollerConfig = {}) => {
     );
 
     tasks.set(taskId, masterPromise);
-    const outcome = await masterPromise.promise;
-    return outcome === 'canceled' ? undefined : outcome;
+    return masterPromise.promise;
   };
 
   const pipe = <T = unknown, E = Error>(...tasks: AsyncTask<T, E>[]) => async (
@@ -127,7 +126,8 @@ export const createPoller = (config: PollerConfig = {}) => {
 
   const clear = () => {
     taskEventMapping.forEach((eventId, taskId) => {
-      tasks.get(taskId)?.cancel();
+      const cachedValue = taskOutcomes.get(taskId);
+      tasks.get(taskId)?.cancel(false, cachedValue);
       window.clearInterval(eventId);
     });
     taskEventMapping.clear();

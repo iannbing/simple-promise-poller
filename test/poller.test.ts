@@ -288,32 +288,29 @@ describe('Poller', () => {
 
     expect(isPollerIdling()).toBe(true);
   });
-  it('clearAllTasks should not result in task rejections, but resolve all tasks with `undefined`', async () => {
-    const mockCallback1 = jest.fn(async () => {
-      return {};
-    });
-    const mockCallback2 = jest.fn(async () => {
-      return 123;
-    });
-    const mockCallback3 = jest.fn(async () => {
-      return 'value';
-    });
+  it('clearAllTasks should not result in task rejections, but resolve all tasks with their last resolved value respectively', async () => {
+    const mockCallback1 = jest.fn(async () => ({}));
+    const mockCallback2 = jest.fn(async () => 123);
+    const mockCallback3 = jest.fn(async () => 'value');
 
-    await Promise.all([
-      poll(mockCallback1).then(result => expect(result).toEqual({})),
-      poll(mockCallback2).then(result => expect(result).toEqual(123)),
-      poll(mockCallback3).then(result => expect(result).toEqual('value')),
+    const [result1, result2, result3] = await Promise.all([
+      poll(mockCallback1),
+      poll(mockCallback2),
+      poll(mockCallback3),
       new Promise<void>(resolve =>
         setTimeout(() => {
-          expect(isPollerIdling()).toBe(false);
           clearAllTasks();
-          expect(mockCallback1).toHaveBeenCalled();
-          expect(mockCallback2).toHaveBeenCalled();
-          expect(mockCallback3).toHaveBeenCalled();
-          expect(isPollerIdling()).toBe(true);
           resolve();
         }, 100)
       ),
     ]);
+
+    expect(mockCallback1).toHaveBeenCalledTimes(8);
+    expect(mockCallback2).toHaveBeenCalledTimes(8);
+    expect(mockCallback3).toHaveBeenCalledTimes(8);
+    expect(result1).toEqual({});
+    expect(result2).toEqual(123);
+    expect(result3).toEqual('value');
+    expect(isPollerIdling()).toBe(true);
   });
 });
