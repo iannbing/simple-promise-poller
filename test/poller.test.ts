@@ -99,30 +99,34 @@ describe('Poller', () => {
   it('should stop polling and resolve the master promise when cancelTask is called without any input.', async () => {
     const times = getRandomNumber();
 
-    let counter = 0;
-    const mockCallback = jest.fn(async (cancelTask: CancelTask<void>) => {
-      counter += 1;
-      if (counter >= times) cancelTask();
-    });
+    const counter = { value: 0 };
+    const mockCallback = jest.fn(
+      async (cancelTask: CancelTask<{ value: number }>) => {
+        counter.value += 1;
+        return counter.value >= times ? cancelTask() : counter;
+      }
+    );
 
     setTimeout(() => {
       expect(isPollerIdling()).toBe(false);
     }, 1);
 
-    await poll(mockCallback);
+    const resolvedValue = await poll(mockCallback);
     expect(isPollerIdling()).toBe(true);
-
+    expect(resolvedValue).toEqual({ value: times });
     expect(mockCallback).toHaveBeenCalledTimes(times);
   });
 
   it('should stop polling and result in a rejection when cancelTask is called with false.', async () => {
     const times = getRandomNumber();
 
-    let counter = 0;
+    const counter = { value: 0 };
     const mockCallback = jest.fn(
-      async (cancelTask: CancelTask<string | number>) => {
-        counter += 1;
-        return counter >= times ? cancelTask(false, 'task failed') : counter;
+      async (cancelTask: CancelTask<string | { value: number }>) => {
+        counter.value += 1;
+        return counter.value >= times
+          ? cancelTask(false, 'task failed')
+          : counter;
       }
     );
 
@@ -141,9 +145,9 @@ describe('Poller', () => {
   it('should stop and clear all tasks when `poller.clear` is called.', async () => {
     const taskCount = getRandomNumber();
 
-    let counter = 0;
+    const counter = { value: 0 };
     const mockCallback = jest.fn(async () => {
-      counter += 1;
+      counter.value += 1;
       return counter;
     });
 
@@ -161,12 +165,13 @@ describe('Poller', () => {
   it('should return the last resolved value if stopTask did not pass any value.', async () => {
     const times = getRandomNumber();
 
-    let counter = 0;
-    const mockCallback = jest.fn(async (cancelTask: CancelTask<number>) => {
-      counter += 1;
-      if (counter >= times) cancelTask();
-      return counter;
-    });
+    const counter = { value: 0 };
+    const mockCallback = jest.fn(
+      async (cancelTask: CancelTask<{ value: number }>) => {
+        counter.value += 1;
+        return counter.value >= times ? cancelTask() : counter;
+      }
+    );
 
     setTimeout(() => {
       expect(isPollerIdling()).toBe(false);
@@ -175,17 +180,21 @@ describe('Poller', () => {
     const value = await poll(mockCallback);
     expect(isPollerIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(times);
-    expect(value).toEqual(times - 1);
+    expect(value).toEqual({ value: times });
   });
 
   it('should return the value passed to cancelTask, if isResolved is true.', async () => {
     const times = getRandomNumber();
 
-    let counter = 0;
-    const mockCallback = jest.fn(async (cancelTask: CancelTask<number>) => {
-      counter += 1;
-      return counter >= times ? cancelTask(true, 100) : counter;
-    });
+    const counter = { value: 0 };
+    const mockCallback = jest.fn(
+      async (cancelTask: CancelTask<{ value: number }>) => {
+        counter.value += 1;
+        return counter.value >= times
+          ? cancelTask(true, { value: 100 })
+          : counter;
+      }
+    );
 
     setTimeout(() => {
       expect(isPollerIdling()).toBe(false);
@@ -194,17 +203,19 @@ describe('Poller', () => {
     const value = await poll(mockCallback);
     expect(isPollerIdling()).toBe(true);
     expect(mockCallback).toHaveBeenCalledTimes(times);
-    expect(value).toEqual(100);
+    expect(value).toEqual({ value: 100 });
   });
 
   it('should reject the master promise, if isResolved is false.', async () => {
     const times = getRandomNumber();
 
-    let counter = 0;
-    const mockCallback = jest.fn(async (cancelTask: CancelTask<number>) => {
-      counter += 1;
-      return counter >= times ? cancelTask(false) : counter;
-    });
+    const counter = { value: 0 };
+    const mockCallback = jest.fn(
+      async (cancelTask: CancelTask<{ value: number }>) => {
+        counter.value += 1;
+        return counter.value >= times ? cancelTask(false) : counter;
+      }
+    );
 
     setTimeout(() => {
       expect(isPollerIdling()).toBe(false);
@@ -215,7 +226,7 @@ describe('Poller', () => {
       value = await poll(mockCallback);
     } catch (error) {
       expect(mockCallback).toHaveBeenCalledTimes(times);
-      expect(error).toEqual(times - 1);
+      expect(error).toEqual({ value: times });
     }
     expect(isPollerIdling()).toBe(true);
     expect(value).toBeUndefined();
@@ -305,9 +316,9 @@ describe('Poller', () => {
       ),
     ]);
 
-    expect(mockCallback1).toHaveBeenCalledTimes(8);
-    expect(mockCallback2).toHaveBeenCalledTimes(8);
-    expect(mockCallback3).toHaveBeenCalledTimes(8);
+    expect(mockCallback1).toHaveBeenCalled();
+    expect(mockCallback2).toHaveBeenCalled();
+    expect(mockCallback3).toHaveBeenCalled();
     expect(result1).toEqual({});
     expect(result2).toEqual(123);
     expect(result3).toEqual('value');
